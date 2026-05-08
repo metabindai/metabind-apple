@@ -1,0 +1,96 @@
+#
+# Fragments.graphql
+#
+# © 2025 Yap Studios LLC
+#
+
+fragment ResolvedPackageDataFields on ResolvedPackageData {
+   id
+   version
+   components
+   assets
+}
+
+fragment ContentFields on Content {
+  id
+  typeId
+  packageVersion
+  name
+  content
+  compiled
+  tags
+  locale
+  createdAt
+  updatedAt
+  lastPublishedVersion
+  resolvedRef {
+    ...ResolvedPackageRefFields
+  }
+}
+
+fragment ResolvedPackageRefFields on ResolvedPackageRef {
+  package
+  dependencies
+}
+
+fragment ComponentFields on Component {
+  id
+  name
+  compiled
+  updatedAt
+}
+
+fragment ContentTypeFields on ContentType {
+  id
+  name
+  packageVersion
+  schema
+  updatedAt
+}
+
+fragment AssetFields on Asset {
+  id
+  name
+  type
+  url
+  size
+  width
+  height
+  tags
+  updatedAt
+}
+
+fragment TagFields on Tag {
+  id
+  name
+  slug
+}
+
+fragment SavedSearchFields on SavedSearch {
+  id
+  name
+  type
+}
+
+fragment PackageDependencyFields on PackageDependency {
+  projectId
+  version
+}
+
+fragment PackageFields on Package {
+  id
+  version
+  components {
+    ...ComponentFields
+  }
+  assets {
+    ...AssetFields
+  }
+  dependencies {
+    ...PackageDependencyFields
+  }
+  compiled
+  resolvedRef {
+    ...ResolvedPackageRefFields
+  }
+}

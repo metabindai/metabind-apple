@@ -1,0 +1,177 @@
+#
+# Queries.graphql
+#
+# © 2025 Yap Studios LLC
+#
+
+query ContentsQuery($typeId: ID, $tags: [String!], $locale: String, $search: String, $filter: ContentFilter, $sort: [SortCriteria!], $cursor: String, $limit: Int = 20) {
+   contents(typeId: $typeId, tags: $tags, locale: $locale, search: $search, filter: $filter, sort: $sort, cursor: $cursor, limit: $limit) {
+      data {
+         ...ContentFields
+      }
+      pagination {
+         cursor
+         hasMore
+         limit
+      }
+   }
+}
+
+query ContentQuery($id: ID!) {
+    content(id: $id) {
+        ...ContentFields
+    }
+}
+
+query ResolvedPackageDataQuery($packageId: ID!) {
+    resolvedPackageData(packageId: $packageId) {
+        ...ResolvedPackageDataFields
+    }
+}
+
+# Component Queries
+query ComponentQuery($id: ID!) {
+    component(id: $id) {
+        ...ComponentFields
+    }
+}
+
+query ComponentsQuery($search: String, $cursor: String, $limit: Int = 20) {
+    components(search: $search, cursor: $cursor, limit: $limit) {
+        data {
+            ...ComponentFields
+        }
+        pagination {
+            cursor
+            hasMore
+            limit
+        }
+    }
+}
+
+# ContentType Queries
+query ContentTypeQuery($id: ID!) {
+    contentType(id: $id) {
+        ...ContentTypeFields
+    }
+}
+
+query ContentTypesQuery($search: String, $cursor: String, $limit: Int = 20) {
+    contentTypes(search: $search, cursor: $cursor, limit: $limit) {
+        data {
+            ...ContentTypeFields
+        }
+        pagination {
+            cursor
+            hasMore
+            limit
+        }
+    }
+}
+
+# Asset Queries
+query AssetQuery($id: ID!) {
+    asset(id: $id) {
+        ...AssetFields
+    }
+}
+
+query AssetsQuery($type: String, $tags: [String!], $search: String, $filter: AssetFilter, $sort: [SortCriteria!], $cursor: String, $limit: Int = 20) {
+    assets(type: $type, tags: $tags, search: $search, filter: $filter, sort: $sort, cursor: $cursor, limit: $limit) {
+        data {
+            ...AssetFields
+        }
+        pagination {
+            cursor
+            hasMore
+            limit
+        }
+    }
+}
+
+# Tag Queries
+query TagQuery($id: ID!) {
+    tag(id: $id) {
+        ...TagFields
+    }
+}
+
+query TagsQuery($search: String, $cursor: String, $limit: Int = 20) {
+    tags(search: $search, cursor: $cursor, limit: $limit) {
+        data {
+            ...TagFields
+        }
+        pagination {
+            cursor
+            hasMore
+            limit
+        }
+    }
+}
+
+# Package Queries
+query PackageQuery($version: String!) {
+    package(version: $version) {
+        ...PackageFields
+    }
+}
+
+query PackagesQuery($cursor: String, $limit: Int = 20) {
+    packages(cursor: $cursor, limit: $limit) {
+        data {
+            ...PackageFields
+        }
+        pagination {
+            cursor
+            hasMore
+            limit
+        }
+    }
+}
+
+# SavedSearch Queries
+query SavedSearchQuery($id: ID!) {
+    savedSearch(id: $id) {
+        ...SavedSearchFields
+    }
+}
+
+query SavedSearchesQuery($type: SavedSearchType, $cursor: String, $limit: Int = 20) {
+    savedSearches(type: $type, cursor: $cursor, limit: $limit) {
+        data {
+            ...SavedSearchFields
+        }
+        pagination {
+            cursor
+            hasMore
+            limit
+        }
+    }
+}
+
+query ExecuteSavedSearchQuery($id: ID!, $cursor: String, $limit: Int = 20) {
+    executeSavedSearch(id: $id, cursor: $cursor, limit: $limit) {
+        ... on ContentList {
+            __typename
+            data {
+                ...ContentFields
+            }
+            pagination {
+                cursor
+                hasMore
+                limit
+            }
+        }
+        ... on AssetList {
+            __typename
+            data {
+                ...AssetFields
+            }
+            pagination {
+                cursor
+                hasMore
+                limit
+            }
+        }
+    }
+}

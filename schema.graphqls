@@ -1,0 +1,259 @@
+"""
+Indicates exactly one field must be supplied and this field must not be `null`.
+"""
+directive @oneOf on INPUT_OBJECT
+
+"""
+A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `date-time` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.
+"""
+scalar DateTime
+
+enum SavedSearchType {
+  CONTENT
+  ASSET
+}
+
+enum SortOrder {
+  ASC
+  DESC
+}
+
+input FilterOperators {
+  eq: String
+  ne: String
+  in: [String!]
+  nin: [String!]
+  all: [String!]
+  any: [String!]
+  like: String
+}
+
+input NumberFilterOperators {
+  eq: Float
+  ne: Float
+  gt: Float
+  gte: Float
+  lt: Float
+  lte: Float
+  in: [Float!]
+  nin: [Float!]
+}
+
+input DateFilterOperators {
+  eq: DateTime
+  ne: DateTime
+  gt: DateTime
+  gte: DateTime
+  lt: DateTime
+  lte: DateTime
+}
+
+input SortCriteria {
+  field: String!
+  order: SortOrder!
+}
+
+input ContentFilter {
+  name: FilterOperators
+  description: FilterOperators
+  tags: FilterOperators
+  typeId: FilterOperators
+  locale: FilterOperators
+  createdAt: DateFilterOperators
+  updatedAt: DateFilterOperators
+}
+
+input AssetFilter {
+  name: FilterOperators
+  type: FilterOperators
+  tags: FilterOperators
+  size: NumberFilterOperators
+  width: NumberFilterOperators
+  height: NumberFilterOperators
+}
+
+type Component {
+  id: ID!
+  name: String!
+  title: String!
+  description: String!
+  content: String!
+  compiled: String!
+  schema: String!
+  status: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Package {
+  id: ID!
+  projectId: ID!
+  version: String!
+  components: [Component!]!
+  assets: [Asset!]!
+  dependencies: [PackageDependency!]!
+  compiled: String!
+  resolved: ResolvedPackage!
+  resolvedRef: ResolvedPackageRef!
+  createdAt: DateTime!
+}
+
+type Content {
+  id: ID!
+  typeId: ID!
+  packageVersion: String!
+  name: String!
+  description: String!
+  content: String!
+  compiled: String!
+  tags: [String!]!
+  locale: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  lastPublishedVersion: Int
+  contentType: ContentType
+  resolvedPackage: ResolvedPackage
+  resolvedRef: ResolvedPackageRef!
+}
+
+type ContentType {
+  id: ID!
+  name: String!
+  description: String!
+  packageVersion: String!
+  schema: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Asset {
+  id: ID!
+  name: String!
+  description: String!
+  type: String!
+  url: String!
+  size: Int!
+  width: Int
+  height: Int
+  tags: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Tag {
+  id: ID!
+  name: String!
+  slug: String!
+  description: String
+}
+
+type SavedSearch {
+  id: ID!
+  name: String!
+  description: String
+  type: SavedSearchType!
+}
+
+type ResolvedPackage {
+  package: ResolvedPackageData!
+  dependencies: [ResolvedPackageData!]!
+}
+
+type ResolvedPackageData {
+  id: ID!
+  version: String!
+  components: String!
+  assets: String!
+}
+
+type ResolvedPackageRef {
+  package: ID!
+  dependencies: [ID!]!
+}
+
+type PackageDependency {
+  projectId: ID!
+  version: String!
+}
+
+type CursorPagination {
+  cursor: String
+  hasMore: Boolean!
+  limit: Int!
+}
+
+type ComponentList {
+  data: [Component!]!
+  pagination: CursorPagination!
+}
+
+type PackageList {
+  data: [Package!]!
+  pagination: CursorPagination!
+}
+
+type ContentList {
+  data: [Content!]!
+  pagination: CursorPagination!
+}
+
+type ContentTypeList {
+  data: [ContentType!]!
+  pagination: CursorPagination!
+}
+
+type AssetList {
+  data: [Asset!]!
+  pagination: CursorPagination!
+}
+
+type TagList {
+  data: [Tag!]!
+  pagination: CursorPagination!
+}
+
+type SavedSearchList {
+  data: [SavedSearch!]!
+  pagination: CursorPagination!
+}
+
+union SavedSearchResult = ContentList | AssetList
+
+type ContentUpdate {
+  contentId: ID!
+  content: Content
+  resolvedRef: ResolvedPackageRef!
+  action: String!
+  timestamp: DateTime!
+}
+
+type ComponentUpdate {
+  componentId: ID!
+  component: Component
+  resolvedRef: ResolvedPackageRef!
+  action: String!
+  timestamp: DateTime!
+}
+
+type Query {
+  components(search: String, cursor: String, limit: Int = 20): ComponentList!
+  component(id: ID!): Component
+  packages(cursor: String, limit: Int = 20): PackageList!
+  package(version: String!): Package
+  contents(typeId: ID, tags: [String!], locale: String, search: String, filter: ContentFilter, sort: [SortCriteria!], cursor: String, limit: Int = 20): ContentList!
+  content(id: ID!): Content
+  contentTypes(search: String, cursor: String, limit: Int = 20): ContentTypeList!
+  contentType(id: ID!): ContentType
+  assets(type: String, tags: [String!], search: String, filter: AssetFilter, sort: [SortCriteria!], cursor: String, limit: Int = 20): AssetList!
+  asset(id: ID!): Asset
+  tags(search: String, cursor: String, limit: Int = 20): TagList!
+  tag(id: ID!): Tag
+  savedSearches(type: SavedSearchType, cursor: String, limit: Int = 20): SavedSearchList!
+  savedSearch(id: ID!): SavedSearch
+  executeSavedSearch(id: ID!, cursor: String, limit: Int = 20): SavedSearchResult!
+  resolvedPackageData(packageId: ID!): ResolvedPackageData
+}
+
+type Subscription {
+  contentUpdated(id: ID!): ContentUpdate!
+}

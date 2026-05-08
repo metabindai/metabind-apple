@@ -1,0 +1,19 @@
+#
+# Subscriptions.graphql
+#
+# © 2025 Yap Studios LLC
+#
+
+subscription ContentUpdatedSubscription($id: ID!) {
+    contentUpdated(id: $id) {
+        contentId
+        content {
+            ...ContentFields
+        }
+        resolvedRef {
+          ...ResolvedPackageRefFields
+        }
+        action
+        timestamp
+    }
+}
