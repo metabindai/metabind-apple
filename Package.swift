@@ -21,7 +21,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apollographql/apollo-ios", exact: "1.23.0"),
-        .package(url: "https://github.com/metabindai/bindjs-apple-binary", from: "1.1.3"),
+        .package(url: "https://github.com/metabindai/bindjs-apple-binary", from: "1.1.4"),
     ],
     targets: [
         .target(
