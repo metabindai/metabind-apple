@@ -16,7 +16,7 @@
       }
     },
     "schemaTypes" : {
-      "path" : "./Sources/Metabind/generated",
+      "path" : "../generated",
       "moduleType" : {
         "other" : {
         }
