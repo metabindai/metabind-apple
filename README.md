@@ -1,25 +1,23 @@
 # Metabind for Apple
 
-The native Metabind SDK for iOS, iPadOS, macOS, and visionOS. Use it to build
-server-driven UI from a content management system you control, and to embed AI
-assistants that render real, interactive interfaces inside your app. Both surfaces
-render as native SwiftUI through BindJS, Metabind's component rendering engine. There
-are no web views.
+The native Apple SDK for Metabind. Embed a governed AI agent in your iOS, macOS, or visionOS app, and render Metabind-managed content as native SwiftUI.
 
-A single package ships three libraries. Import only the ones you need.
+## What this is
 
-## Products
+Metabind is the agentic layer for your app. It turns your existing UI and APIs into a governed agent: a standards-compliant [Model Context Protocol (MCP)](https://modelcontextprotocol.io) App that understands what each customer came for, renders real interactive UI instead of plain text, and runs both inside your own app and across Claude, ChatGPT, and every MCP host. The agent is governed, not autonomous. It follows the system prompt you author, and it can only render components you approved, validated against each tool's schema on every render.
+
+This package is the Apple side. It ships three libraries you can adopt independently:
 
 | Library | Use it to |
 |---|---|
-| `MetabindContent` | Fetch and render content from Metabind's headless content platform. A SwiftUI view, an async/await GraphQL client, SQLite-backed caching, and real-time updates over WebSocket. |
-| `MetabindAI` | Drop a conversational AI assistant into your app. `MetabindAssistantView` wires up the language model, Model Context Protocol (MCP) tool calls, and interactive rendering for you. |
-| `MCPAppsHost` | Render a single MCP tool result without the conversational layer. The low-level building blocks (`MCPAppsClient`, `MCPAppSession`, `MCPAppView`) that `MetabindAssistant` is built on. |
+| `MetabindAI` | Embed the agent in your app. The Assistant SDK drops in a conversational view that runs the agent and renders its Interactive Tool responses as native SwiftUI. |
+| `MCPAppsHost` | Render a single MCP tool result without the conversational layer. The low-level building blocks (`MCPAppsClient`, `MCPAppSession`, `MCPAppView`) that `MetabindAI` is built on. |
+| `MetabindContent` | Fetch and render content from Metabind's content platform. A SwiftUI view, an async/await GraphQL client, SQLite-backed caching, and real-time updates over WebSocket. |
 
-Metabind is the commercial content platform. BindJS is the open-source framework that
-renders its components natively. Your app links BindJS through a precompiled binary, so
-the engine is the same one that powers Metabind content in Claude, ChatGPT, and every
-other MCP host.
+Everything renders through BindJS as real native SwiftUI, not web views. The three libraries have different dependency footprints, so you import only the ones you use: a content-only app doesn't link the assistant, and an assistant-only app doesn't link the GraphQL client.
+
+> [!NOTE]
+> BindJS is Metabind's rendering engine. This SDK links it as a precompiled binary (`bindjs-apple-binary`). The BindJS authoring layer and React renderer are Apache 2.0; the native SwiftUI and Jetpack Compose runtimes are proprietary and ship with the SDK.
 
 ## Requirements
 
@@ -37,28 +35,162 @@ dependencies: [
 ]
 ```
 
-Then add the products you need to your target:
+Then add the libraries you need to your target:
 
 ```swift
 .target(name: "YourApp", dependencies: [
-    .product(name: "MetabindContent", package: "metabind-apple"),    // content SDK
-    .product(name: "MetabindAI", package: "metabind-apple"),         // AI assistant
-    .product(name: "MCPAppsHost", package: "metabind-apple"),        // low-level rendering
+    .product(name: "MetabindAI", package: "metabind-apple"),        // embed the agent
+    .product(name: "MCPAppsHost", package: "metabind-apple"),       // low-level rendering
+    .product(name: "MetabindContent", package: "metabind-apple"),   // content SDK
 ])
 ```
 
-In Xcode, choose File > Add Package Dependencies, enter the repository URL, and select
-the libraries you want.
+In Xcode, choose File > Add Package Dependencies, enter the repository URL, and select the libraries you want.
 
 ---
 
-# MetabindContent: the content SDK
+## MetabindAI: embed the agent
 
-Fetch content from Metabind's headless content platform and render it as native
-SwiftUI. Metabind manages both the content and its presentation, so you update layouts
-and experiences over the air without shipping a new build.
+`MetabindAI` is the Assistant SDK. It embeds your Metabind agent inside your own app, calling real tools and rendering real interactive UI as native SwiftUI, governed by the same MCP App you publish to Claude, ChatGPT, and every other MCP host. One MCP App definition powers two surfaces: a hosted MCP server that every AI host can discover, and a drop-in native assistant inside your app. This library handles the second.
 
-## Initialize the client
+When a tool returns a `ui` resource, the SDK fetches the BindJS bundle and renders it as native SwiftUI, the same interface a person sees in Claude or ChatGPT, running natively inside your app. Format negotiation is automatic: on the MCP `initialize` handshake, the client advertises the MIME types its registered `ContentResolver`s support (`application/vnd.bindjs+json` for native rendering, `text/html;profile=mcp-app` as a fallback) through the `io.modelcontextprotocol/ui` capability extension. The server picks the right bundle format for each call, so you never set `Accept` headers yourself.
+
+### Quick start: agent proxy
+
+`MetabindAgentProvider` routes the conversation through `agent.metabind.ai`. The proxy holds your language model credentials server-side, runs the tool-use loop, and streams normalized events back, so your app ships no Anthropic or OpenAI keys:
+
+```swift
+import SwiftUI
+import MetabindAI
+
+struct ContentView: View {
+    @State private var assistant = MetabindAssistant(
+        serverURL: URL(string: "https://mcp.metabind.ai/<org>/projects/<project>")!,
+        serverHeaders: ["authorization": "Bearer \(metabindApiKey)"],
+        provider: MetabindAgentProvider(
+            apiKey: metabindApiKey,
+            orgId: "<org>",
+            projectId: "<project>"
+        )
+    )
+
+    var body: some View {
+        MetabindAssistantView(assistant: assistant)
+    }
+}
+```
+
+One Metabind API key authenticates both the MCP server and the agent proxy. Create one in MCP App Studio, or with `metabind api-key create`.
+
+### Quick start: Anthropic (BYOK)
+
+To run the tool-use loop on device against your own Anthropic key, swap the provider:
+
+```swift
+@State private var assistant = MetabindAssistant(
+    serverURL: URL(string: "https://mcp.metabind.ai/<org>/projects/<project>")!,
+    serverHeaders: ["authorization": "Bearer \(mcpBearer)"],
+    provider: AnthropicProvider(apiKey: anthropicKey)
+)
+```
+
+Same view, same observable surface, a different conversation engine.
+
+### Build a custom UI
+
+`MetabindAssistant` is `@Observable`. Its `conversation`, `isProcessing`, `tools`, and `pendingContext` are all observable, so you can build an entirely custom interface instead of using `MetabindAssistantView`.
+
+### useMCPHost: components calling back into your app
+
+BindJS components rendered inside a tool result reach host capabilities through `useMCPHost()`:
+
+```js
+// inside a BindJS component
+const host = useMCPHost()
+if (host) {
+    const { products } = await host.toolCall('search_products', { query })
+    await host.updateModelContext({ selectedProduct: products[0] })
+    await host.sendMessage('Tell me more about this one')
+    const answer = await host.elicit(
+        { type: 'object', properties: { email: { type: 'string' } } },
+        { title: 'Sign up for updates' }
+    )
+}
+```
+
+When you use `MetabindAssistant`, `assistant.hostBridge` is pre-wired, so components see:
+
+- `toolCall(name, args)` runs a tool through the MCP server and returns unwrapped structured data.
+- `sendMessage(text)` injects a new user turn into the conversation.
+- `updateModelContext(dict)` buffers structured context as a `<context>{…}</context>` prefix on the next user turn. The visible chat bubble stays clean.
+- `log(level, message, data)` routes through `os.Logger`, subsystem `MetabindAssistant.Host`.
+
+`MetabindAssistantView` also wires `openLink(url)` to SwiftUI's `@Environment(\.openURL)`.
+
+Fill in the rest by setting handlers on `assistant.hostBridge.handlers`:
+
+```swift
+.task {
+    assistant.hostBridge.handlers.onElicit = { schema, metadata in
+        // Present a SwiftUI sheet derived from `schema`
+        return ElicitationResponse(action: .accept, content: [...])
+    }
+    assistant.hostBridge.handlers.onDisplayMode = { requested in
+        return .fullscreen
+    }
+}
+```
+
+For an app that uses `MCPAppView` on its own, without the assistant, build a bridge and inject it directly:
+
+```swift
+MCPAppView(session: session)
+    .mcpHostBridge(myBridge)
+```
+
+---
+
+## MCPAppsHost: render a single tool result
+
+`MCPAppsHost` renders one MCP tool result without the conversational wrapper:
+
+```swift
+import SwiftUI
+import MCPAppsHost
+
+struct ContentView: View {
+    let client = MCPAppsClient(
+        url: URL(string: "https://your-mcp-server.example.com")!,
+        headers: ["authorization": "Bearer \(token)"]
+    )
+
+    @State private var session: MCPAppSession?
+
+    var body: some View {
+        VStack {
+            Button("Launch tool") {
+                let call = SimpleMCPToolCall(
+                    id: UUID().uuidString,
+                    name: "create_promotion",
+                    arguments: .object([:])
+                )
+                session = MCPAppSession(toolCall: call, server: client)
+            }
+            if let session {
+                MCPAppView(session: session)
+            }
+        }
+    }
+}
+```
+
+---
+
+## MetabindContent: the content SDK
+
+`MetabindContent` fetches content from Metabind's content platform and renders it as native SwiftUI. The platform manages both the content and its presentation, so you update layouts and experiences over the air without shipping a new build.
+
+### Initialize the client
 
 Create a `MetabindClient` and inject it into the SwiftUI environment:
 
@@ -85,13 +217,11 @@ struct MyApp: App {
 }
 ```
 
-Find your organization ID, project ID, and API key in Metabind under Settings > General
-and Settings > API Keys.
+Find your organization ID, project ID, and API key in Metabind under Settings > General and Settings > API Keys.
 
-## Render content with MetabindView
+### Render content with MetabindView
 
-`MetabindView` reads `MetabindClient` from the environment. It fetches, caches, and
-renders content, and handles its own loading, error, and success states:
+`MetabindView` reads `MetabindClient` from the environment. It fetches, caches, and renders content, and handles its own loading, error, and success states:
 
 ```swift
 import SwiftUI
@@ -111,7 +241,7 @@ struct ContentScreen: View {
 - Optional real-time subscriptions over WebSocket.
 - A task lifecycle tied to the view, so requests cancel automatically.
 
-## Real-time updates
+### Real-time updates
 
 Set `enableSubscription` to `true` to keep a view in sync with Metabind:
 
@@ -119,24 +249,19 @@ Set `enableSubscription` to `true` to keep a view in sync with Metabind:
 MetabindView(contentId: "cont_123", enableSubscription: true)
 ```
 
-The view runs the content stream for the initial load and a WebSocket subscription for
-live updates. When you publish a change in Metabind, the view updates in place.
+The view runs the content stream for the initial load and a WebSocket subscription for live updates. When you publish a change in Metabind, the view updates in place.
 
-## Working with the API directly
+### Work with the API directly
 
-For more control, call the `MetabindClient` APIs yourself. Every resource follows the
-same three-method pattern:
+For more control, call the `MetabindClient` APIs yourself. Every resource follows the same three-method pattern:
 
 - `fetch*()` runs a single async/await request.
 - `stream*()` returns an `AsyncStream` that yields cached data first, then network updates.
 - `subscribeTo*()` opens a real-time WebSocket subscription. (Content only.)
 
-For the complete API, see the
-[Metabind GraphQL documentation](https://docs.metabind.ai/graphql/overview). The schema
-also lives in this repository at
-[`Sources/Metabind/GraphQL/schema.graphqls`](Sources/Metabind/GraphQL/schema.graphqls).
+For the complete API, see the [Metabind GraphQL documentation](https://docs.metabind.ai/graphql/overview). The schema also lives in this repository at [`Sources/MetabindContent/GraphQL/schema.graphqls`](Sources/MetabindContent/GraphQL/schema.graphqls).
 
-### Content
+#### Content
 
 Fetch and display individual content entries:
 
@@ -165,7 +290,7 @@ for await result in client.subscribeToContent(id: "cont_123") {
 }
 ```
 
-### Contents (list)
+#### Contents (list)
 
 Fetch paginated lists of content, with filtering and sorting:
 
@@ -191,7 +316,7 @@ for await result in client.streamContents(typeId: "type_123", tags: ["featured"]
 }
 ```
 
-### Components
+#### Components
 
 Fetch component definitions:
 
@@ -209,7 +334,7 @@ for await result in client.streamComponents(search: "Card") {
 }
 ```
 
-### Content types
+#### Content types
 
 Fetch content type schemas:
 
@@ -228,7 +353,7 @@ for await result in client.streamContentTypes() {
 }
 ```
 
-### Assets
+#### Assets
 
 Fetch media assets such as images, videos, and files:
 
@@ -250,7 +375,7 @@ for await result in client.streamAssets(type: "image/png") {
 }
 ```
 
-### Tags
+#### Tags
 
 Fetch the tags that organize content and assets:
 
@@ -268,7 +393,7 @@ for await result in client.streamTags() {
 }
 ```
 
-### Packages
+#### Packages
 
 Fetch published component packages, which are versioned snapshots:
 
@@ -285,7 +410,7 @@ for await result in client.streamPackages() {
 }
 ```
 
-### Saved searches
+#### Saved searches
 
 Run searches you configured in Metabind:
 
@@ -313,7 +438,7 @@ if let contentList = results.asContentList {
 }
 ```
 
-## Direct rendering with BindJSView
+### Direct rendering with BindJSView
 
 For advanced cases, fetch content and render it with `BindJSView`:
 
@@ -352,7 +477,7 @@ struct CustomContentView: View {
 }
 ```
 
-## Parse content data
+### Parse content data
 
 Extract structured data from content for your own logic:
 
@@ -368,7 +493,7 @@ let items = propertyMap["items"]?.array
 let metadata = propertyMap["metadata"]?.object
 ```
 
-## Cache policies
+### Cache policies
 
 Control caching with `CachePolicy`:
 
@@ -393,7 +518,7 @@ let cached = try await client.fetchContent(
 )
 ```
 
-## Error handling
+### Error handling
 
 ```swift
 do {
@@ -414,178 +539,20 @@ do {
 
 ---
 
-# MetabindAI: the AI assistant SDK
+## Samples
 
-Embed a Metabind AI assistant in your app, one that calls real tools and renders real
-interactive UI as native SwiftUI, governed by the same MCP App you publish to Claude,
-ChatGPT, and every other MCP host. A single MCP App definition powers two surfaces: a
-hosted MCP server that every AI host can discover, and a drop-in native assistant inside
-your own app. `MetabindAssistant` handles the second.
-
-When an MCP App returns a `ui` resource, the SDK fetches the BindJS bundle and renders it
-as native SwiftUI, the same interface a person sees in Claude or ChatGPT, running
-natively inside your app. Format negotiation is automatic: on the MCP `initialize`
-handshake, the client advertises the MIME types its registered `ContentResolver`s
-support (`application/vnd.bindjs+json` for native rendering, `text/html;profile=mcp-app`
-as a fallback) through the `io.modelcontextprotocol/ui` capability extension. The server
-picks the right bundle format for each call, so you never set `Accept` headers yourself.
-
-## Quick start: Agent proxy
-
-`MetabindAgentProvider` routes the conversation through `agent.metabind.ai`. The proxy
-holds your language model credentials server-side, runs the tool-use loop, and streams
-normalized events back. Your app ships no Anthropic or OpenAI keys:
-
-```swift
-import SwiftUI
-import MetabindAI
-
-struct ContentView: View {
-    @State private var assistant = MetabindAssistant(
-        serverURL: URL(string: "https://mcp.metabind.ai/<org>/projects/<project>")!,
-        serverHeaders: ["authorization": "Bearer \(metabindApiKey)"],
-        provider: MetabindAgentProvider(
-            apiKey: metabindApiKey,
-            orgId: "<org>",
-            projectId: "<project>"
-        )
-    )
-
-    var body: some View {
-        MetabindAssistantView(assistant: assistant)
-    }
-}
-```
-
-One Metabind API key authenticates both the MCP server and the agent proxy. Create one
-in Metabind, or with `metabind api-key create`.
-
-## Quick start: Anthropic (BYOK)
-
-To run the tool-use loop on device against your own Anthropic key, swap the provider:
-
-```swift
-@State private var assistant = MetabindAssistant(
-    serverURL: URL(string: "https://mcp.metabind.ai/<org>/projects/<project>")!,
-    serverHeaders: ["authorization": "Bearer \(mcpBearer)"],
-    provider: AnthropicProvider(apiKey: anthropicKey)
-)
-```
-
-Same view, same observable surface, a different conversation engine.
-
-## Build a custom UI
-
-`MetabindAssistant` is `@Observable`. Its `conversation`, `isProcessing`, `tools`, and
-`pendingContext` are all observable, so you can build an entirely custom interface
-instead of using `MetabindAssistantView`.
-
-## useMCPHost: components calling back into your app
-
-BindJS components rendered inside a tool result reach host capabilities through
-`useMCPHost()`:
-
-```js
-// inside a BindJS component
-const host = useMCPHost()
-if (host) {
-    const { products } = await host.toolCall('search_products', { query })
-    await host.updateModelContext({ selectedProduct: products[0] })
-    await host.sendMessage('Tell me more about this one')
-    const answer = await host.elicit(
-        { type: 'object', properties: { email: { type: 'string' } } },
-        { title: 'Sign up for updates' }
-    )
-}
-```
-
-When you use `MetabindAssistant`, `assistant.hostBridge` is pre-wired, so components see:
-
-- `toolCall(name, args)` runs a tool through the MCP server and returns unwrapped
-  structured data.
-- `sendMessage(text)` injects a new user turn into the conversation.
-- `updateModelContext(dict)` buffers structured context as a `<context>{…}</context>`
-  prefix on the next user turn. The visible chat bubble stays clean.
-- `log(level, message, data)` routes through `os.Logger`, subsystem
-  `MetabindAssistant.Host`.
-
-`MetabindAssistantView` also wires `openLink(url)` to SwiftUI's `@Environment(\.openURL)`.
-
-Fill in the rest by setting handlers on `assistant.hostBridge.handlers`:
-
-```swift
-.task {
-    assistant.hostBridge.handlers.onElicit = { schema, metadata in
-        // Present a SwiftUI sheet derived from `schema`
-        return ElicitationResponse(action: .accept, content: [...])
-    }
-    assistant.hostBridge.handlers.onDisplayMode = { requested in
-        return .fullscreen
-    }
-}
-```
-
-For an app that uses `MCPAppView` on its own, without the assistant, build a bridge and
-inject it directly:
-
-```swift
-MCPAppView(session: session)
-    .mcpHostBridge(myBridge)
-```
-
----
-
-# MCPAppsHost: low-level rendering
-
-Render a single tool result without the conversational wrapper:
-
-```swift
-import SwiftUI
-import MCPAppsHost
-
-struct ContentView: View {
-    let client = MCPAppsClient(
-        url: URL(string: "https://your-mcp-server.example.com")!,
-        headers: ["authorization": "Bearer \(token)"]
-    )
-
-    @State private var session: MCPAppSession?
-
-    var body: some View {
-        VStack {
-            Button("Launch tool") {
-                let call = SimpleMCPToolCall(
-                    id: UUID().uuidString,
-                    name: "create_promotion",
-                    arguments: .object([:])
-                )
-                session = MCPAppSession(toolCall: call, server: client)
-            }
-            if let session {
-                MCPAppView(session: session)
-            }
-        }
-    }
-}
-```
-
----
-
-# Samples
-
-Three sample apps live in [`Samples/`](Samples). Each references this package locally, so
-you can open one, build it, and see the SDK working against the current source.
+Three sample apps live in [`Samples/`](Samples). Each references this package locally, so you can open one, build it, and see the SDK working against the current source.
 
 | Sample | Shows |
 |---|---|
 | [Retail](Samples/MetabindContent/Retail) | A minimal `MetabindContent` integration: initialize the client, render content, and route between pages. |
 | [Spotlight](Samples/MetabindContent/Spotlight) | A richer `MetabindContent` integration: multiple content blocks, real-time updates, push notifications, and deep links. Includes a full account-setup guide. |
-| [AssistantDemo](Samples/MetabindAI/AssistantDemo) | A `MetabindAssistant` chat app whose tool returns render as live, native SwiftUI. About 20 lines of integration code. |
+| [AssistantDemo](Samples/MetabindAI/AssistantDemo) | A `MetabindAI` chat app whose tool returns render as live, native SwiftUI. About 20 lines of integration code. |
 
-To use a sample outside this repository, change its package reference from the local path
-to the published package URL, `https://github.com/metabindai/metabind-apple`.
+> [!NOTE]
+> To use a sample outside this repository, change its package reference from the local path to the published package URL, `https://github.com/metabindai/metabind-apple`.
 
-# Logging
+## Logging
 
 Every layer logs through `os.Logger`:
 
@@ -607,27 +574,22 @@ log show --info --debug --last 5m \
   --predicate 'subsystem BEGINSWITH "MetabindAssistant" OR subsystem == "MCPAppsHost" OR subsystem == "BindJS"'
 ```
 
-# Regenerating GraphQL code
+## Regenerating GraphQL code
 
-The GraphQL schema, operations, and `apollo-codegen-config.json` live in
-[`Sources/Metabind/GraphQL/`](Sources/Metabind/GraphQL). Run codegen from that directory
-so the config's relative paths resolve correctly:
+The GraphQL schema, operations, and `apollo-codegen-config.json` live in [`Sources/MetabindContent/GraphQL/`](Sources/MetabindContent/GraphQL). Run codegen from that directory so the config's relative paths resolve correctly:
 
 ```bash
-cd Sources/Metabind/GraphQL
+cd Sources/MetabindContent/GraphQL
 apollo-ios-cli generate
 ```
 
-Generated code is written to `Sources/Metabind/generated/`. Never edit those files by
-hand.
+Generated code is written to `Sources/MetabindContent/generated/`. Never edit those files by hand.
 
-# Dependencies
+## Dependencies
 
-- Apollo iOS 1.23.0, the GraphQL client, with WebSocket and SQLite support. Used by
-  `MetabindContent`.
-- BindJS, the component rendering engine, linked through the precompiled
-  `bindjs-apple-binary` package. Used by all three libraries.
+- Apollo iOS 1.23.0, the GraphQL client, with WebSocket and SQLite support. Used by `MetabindContent`.
+- BindJS, the native rendering engine, linked through the precompiled `bindjs-apple-binary` package. Used by all three libraries.
 
-# License
+## License
 
 Copyright © 2026 Yap Studios LLC. All rights reserved. See [`LICENSE`](LICENSE).
