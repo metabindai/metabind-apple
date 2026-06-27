@@ -16,7 +16,7 @@
 		600361C09329BC7AFD57DC63 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		9D867DCE8A4D2F008DDCE67C /* MetabindAssistantDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MetabindAssistantDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0C00CC36A1D25401D6A93F2 /* MetabindAssistantDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetabindAssistantDemoApp.swift; sourceTree = "<group>"; };
-		FDFBAFA672E45308608F2B8B /* metabind-apple */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "metabind-apple"; path = "../.."; sourceTree = SOURCE_ROOT; };
+		FDFBAFA672E45308608F2B8B /* metabind-apple */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "metabind-apple"; path = "../../.."; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -344,9 +344,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		F5F2566A80784A90059DBAAF /* XCLocalSwiftPackageReference "../.." */ = {
+		F5F2566A80784A90059DBAAF /* XCLocalSwiftPackageReference "../../.." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../..";
+			relativePath = "../../..";
 		};
 /* End XCLocalSwiftPackageReference section */
 

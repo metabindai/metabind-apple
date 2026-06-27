@@ -578,9 +578,9 @@ you can open one, build it, and see the SDK working against the current source.
 
 | Sample | Shows |
 |---|---|
-| [Retail](Samples/Retail) | A minimal `Metabind` integration: initialize the client, render content, and route between pages. |
-| [Spotlight](Samples/Spotlight) | A richer `Metabind` integration: multiple content blocks, real-time updates, push notifications, and deep links. Includes a full account-setup guide. |
-| [AssistantDemo](Samples/AssistantDemo) | A `MetabindAssistant` chat app whose tool returns render as live, native SwiftUI. About 20 lines of integration code. |
+| [Retail](Samples/MetabindContent/Retail) | A minimal `Metabind` integration: initialize the client, render content, and route between pages. |
+| [Spotlight](Samples/MetabindContent/Spotlight) | A richer `Metabind` integration: multiple content blocks, real-time updates, push notifications, and deep links. Includes a full account-setup guide. |
+| [AssistantDemo](Samples/MetabindAI/AssistantDemo) | A `MetabindAssistant` chat app whose tool returns render as live, native SwiftUI. About 20 lines of integration code. |
 
 To use a sample outside this repository, change its package reference from the local path
 to the published package URL, `https://github.com/metabindai/metabind-apple`.
