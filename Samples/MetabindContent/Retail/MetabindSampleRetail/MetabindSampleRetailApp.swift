@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import Metabind
+import MetabindContent
 
 // MARK: - App Entry Point
 

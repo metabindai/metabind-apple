@@ -15,7 +15,7 @@ let package = Package(
         .visionOS(.v1)
     ],
     products: [
-        .library(name: "Metabind", targets: ["Metabind"]),
+        .library(name: "MetabindContent", targets: ["MetabindContent"]),
         .library(name: "MCPAppsHost", targets: ["MCPAppsHost"]),
         .library(name: "MetabindAssistant", targets: ["MetabindAssistant"]),
     ],
@@ -25,7 +25,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "Metabind",
+            name: "MetabindContent",
             dependencies: [
                 .product(name: "Apollo", package: "apollo-ios"),
                 .product(name: "ApolloSQLite", package: "apollo-ios"),

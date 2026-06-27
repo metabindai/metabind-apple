@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-import Metabind
+import MetabindContent
 
 struct ContentView : View {
     @Binding var selectedCTA: String?

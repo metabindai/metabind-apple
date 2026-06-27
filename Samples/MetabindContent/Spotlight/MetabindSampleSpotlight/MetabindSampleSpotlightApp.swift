@@ -1,5 +1,5 @@
 import SwiftUI
-import Metabind
+import MetabindContent
 
 /// The app entry point. Demonstrates the two things every Metabind app needs:
 ///

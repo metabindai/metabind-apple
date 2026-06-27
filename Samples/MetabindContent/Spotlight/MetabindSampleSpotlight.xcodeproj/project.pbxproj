@@ -352,9 +352,9 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		07A7E1B52EE8A833002B8C7B /* Metabind */ = {
+		07A7E1B52EE8A833002B8C7B /* MetabindContent */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = Metabind;
+			productName = MetabindContent;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -12,7 +12,7 @@ A single package ships three libraries. Import only the ones you need.
 
 | Library | Use it to |
 |---|---|
-| `Metabind` | Fetch and render content from Metabind's headless content platform. A SwiftUI view, an async/await GraphQL client, SQLite-backed caching, and real-time updates over WebSocket. |
+| `MetabindContent` | Fetch and render content from Metabind's headless content platform. A SwiftUI view, an async/await GraphQL client, SQLite-backed caching, and real-time updates over WebSocket. |
 | `MetabindAssistant` | Drop a conversational AI assistant into your app. `MetabindAssistantView` wires up the language model, Model Context Protocol (MCP) tool calls, and interactive rendering for you. |
 | `MCPAppsHost` | Render a single MCP tool result without the conversational layer. The low-level building blocks (`MCPAppsClient`, `MCPAppSession`, `MCPAppView`) that `MetabindAssistant` is built on. |
 
@@ -41,7 +41,7 @@ Then add the products you need to your target:
 
 ```swift
 .target(name: "YourApp", dependencies: [
-    .product(name: "Metabind", package: "metabind-apple"),           // content SDK
+    .product(name: "MetabindContent", package: "metabind-apple"),    // content SDK
     .product(name: "MetabindAssistant", package: "metabind-apple"),  // AI assistant
     .product(name: "MCPAppsHost", package: "metabind-apple"),        // low-level rendering
 ])
@@ -52,7 +52,7 @@ the libraries you want.
 
 ---
 
-# Metabind: the content SDK
+# MetabindContent: the content SDK
 
 Fetch content from Metabind's headless content platform and render it as native
 SwiftUI. Metabind manages both the content and its presentation, so you update layouts
@@ -64,7 +64,7 @@ Create a `MetabindClient` and inject it into the SwiftUI environment:
 
 ```swift
 import SwiftUI
-import Metabind
+import MetabindContent
 
 @main
 struct MyApp: App {
@@ -95,7 +95,7 @@ renders content, and handles its own loading, error, and success states:
 
 ```swift
 import SwiftUI
-import Metabind
+import MetabindContent
 
 struct ContentScreen: View {
     var body: some View {
@@ -319,7 +319,7 @@ For advanced cases, fetch content and render it with `BindJSView`:
 
 ```swift
 import SwiftUI
-import Metabind
+import MetabindContent
 import BindJS
 
 struct CustomContentView: View {
@@ -578,8 +578,8 @@ you can open one, build it, and see the SDK working against the current source.
 
 | Sample | Shows |
 |---|---|
-| [Retail](Samples/MetabindContent/Retail) | A minimal `Metabind` integration: initialize the client, render content, and route between pages. |
-| [Spotlight](Samples/MetabindContent/Spotlight) | A richer `Metabind` integration: multiple content blocks, real-time updates, push notifications, and deep links. Includes a full account-setup guide. |
+| [Retail](Samples/MetabindContent/Retail) | A minimal `MetabindContent` integration: initialize the client, render content, and route between pages. |
+| [Spotlight](Samples/MetabindContent/Spotlight) | A richer `MetabindContent` integration: multiple content blocks, real-time updates, push notifications, and deep links. Includes a full account-setup guide. |
 | [AssistantDemo](Samples/MetabindAI/AssistantDemo) | A `MetabindAssistant` chat app whose tool returns render as live, native SwiftUI. About 20 lines of integration code. |
 
 To use a sample outside this repository, change its package reference from the local path
@@ -624,7 +624,7 @@ hand.
 # Dependencies
 
 - Apollo iOS 1.23.0, the GraphQL client, with WebSocket and SQLite support. Used by
-  `Metabind`.
+  `MetabindContent`.
 - BindJS, the component rendering engine, linked through the precompiled
   `bindjs-apple-binary` package. Used by all three libraries.
 
