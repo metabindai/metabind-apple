@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import MetabindAssistant
+@testable import MetabindAI
 @testable import MCPAppsHost
 
 @MainActor

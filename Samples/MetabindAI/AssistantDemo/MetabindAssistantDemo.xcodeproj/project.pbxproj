@@ -9,7 +9,7 @@
 /* Begin PBXBuildFile section */
 		AEA8284AB352043E2881A5C9 /* MetabindAssistantDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C00CC36A1D25401D6A93F2 /* MetabindAssistantDemoApp.swift */; };
 		DA516EF68788681C1C54618E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 600361C09329BC7AFD57DC63 /* ContentView.swift */; };
-		F218E1A82FB06FFF501ACD40 /* MetabindAssistant in Frameworks */ = {isa = PBXBuildFile; productRef = 4F5B19C68739E268623414ED /* MetabindAssistant */; };
+		F218E1A82FB06FFF501ACD40 /* MetabindAI in Frameworks */ = {isa = PBXBuildFile; productRef = 4F5B19C68739E268623414ED /* MetabindAI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,7 +24,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F218E1A82FB06FFF501ACD40 /* MetabindAssistant in Frameworks */,
+				F218E1A82FB06FFF501ACD40 /* MetabindAI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -89,7 +89,7 @@
 			);
 			name = MetabindAssistantDemo;
 			packageProductDependencies = (
-				4F5B19C68739E268623414ED /* MetabindAssistant */,
+				4F5B19C68739E268623414ED /* MetabindAI */,
 			);
 			productName = MetabindAssistantDemo;
 			productReference = 9D867DCE8A4D2F008DDCE67C /* MetabindAssistantDemo.app */;
@@ -351,9 +351,9 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		4F5B19C68739E268623414ED /* MetabindAssistant */ = {
+		4F5B19C68739E268623414ED /* MetabindAI */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = MetabindAssistant;
+			productName = MetabindAI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -1,6 +1,6 @@
 import SwiftUI
 import Security
-import MetabindAssistant
+import MetabindAI
 
 struct ContentView: View {
     @State private var metabindApiKey: String = KeychainKey.load() ?? ""

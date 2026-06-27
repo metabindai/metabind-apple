@@ -13,7 +13,7 @@ A single package ships three libraries. Import only the ones you need.
 | Library | Use it to |
 |---|---|
 | `MetabindContent` | Fetch and render content from Metabind's headless content platform. A SwiftUI view, an async/await GraphQL client, SQLite-backed caching, and real-time updates over WebSocket. |
-| `MetabindAssistant` | Drop a conversational AI assistant into your app. `MetabindAssistantView` wires up the language model, Model Context Protocol (MCP) tool calls, and interactive rendering for you. |
+| `MetabindAI` | Drop a conversational AI assistant into your app. `MetabindAssistantView` wires up the language model, Model Context Protocol (MCP) tool calls, and interactive rendering for you. |
 | `MCPAppsHost` | Render a single MCP tool result without the conversational layer. The low-level building blocks (`MCPAppsClient`, `MCPAppSession`, `MCPAppView`) that `MetabindAssistant` is built on. |
 
 Metabind is the commercial content platform. BindJS is the open-source framework that
@@ -42,7 +42,7 @@ Then add the products you need to your target:
 ```swift
 .target(name: "YourApp", dependencies: [
     .product(name: "MetabindContent", package: "metabind-apple"),    // content SDK
-    .product(name: "MetabindAssistant", package: "metabind-apple"),  // AI assistant
+    .product(name: "MetabindAI", package: "metabind-apple"),         // AI assistant
     .product(name: "MCPAppsHost", package: "metabind-apple"),        // low-level rendering
 ])
 ```
@@ -414,7 +414,7 @@ do {
 
 ---
 
-# MetabindAssistant: the AI assistant SDK
+# MetabindAI: the AI assistant SDK
 
 Embed a Metabind AI assistant in your app, one that calls real tools and renders real
 interactive UI as native SwiftUI, governed by the same MCP App you publish to Claude,
@@ -438,7 +438,7 @@ normalized events back. Your app ships no Anthropic or OpenAI keys:
 
 ```swift
 import SwiftUI
-import MetabindAssistant
+import MetabindAI
 
 struct ContentView: View {
     @State private var assistant = MetabindAssistant(

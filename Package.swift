@@ -17,7 +17,7 @@ let package = Package(
     products: [
         .library(name: "MetabindContent", targets: ["MetabindContent"]),
         .library(name: "MCPAppsHost", targets: ["MCPAppsHost"]),
-        .library(name: "MetabindAssistant", targets: ["MetabindAssistant"]),
+        .library(name: "MetabindAI", targets: ["MetabindAI"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apollographql/apollo-ios", exact: "1.23.0"),
@@ -41,7 +41,7 @@ let package = Package(
             ]
         ),
         .target(
-            name: "MetabindAssistant",
+            name: "MetabindAI",
             dependencies: ["MCPAppsHost"]
         ),
         .testTarget(
@@ -49,8 +49,8 @@ let package = Package(
             dependencies: ["MCPAppsHost"]
         ),
         .testTarget(
-            name: "MetabindAssistantTests",
-            dependencies: ["MetabindAssistant"]
+            name: "MetabindAITests",
+            dependencies: ["MetabindAI"]
         ),
     ]
 )
