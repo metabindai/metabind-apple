@@ -1,0 +1,30 @@
+{
+  "schemaNamespace" : "MetabindContent",
+  "input" : {
+    "operationSearchPaths" : [
+      "*.graphql",
+      "**/*.graphql"
+    ],
+    "schemaSearchPaths" : [
+      "*.graphqls",
+      "**/*.graphqls"
+    ]
+  },
+  "output" : {
+    "testMocks" : {
+      "none" : {
+      }
+    },
+    "schemaTypes" : {
+      "path" : "../generated",
+      "moduleType" : {
+        "other" : {
+        }
+      }
+    },
+    "operations" : {
+      "inSchemaModule" : {
+      }
+    }
+  }
+}
