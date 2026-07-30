@@ -44,8 +44,8 @@ apollo-ios-cli generate
 ## Dependencies
 
 - **Apollo iOS** — pinned `exact: "1.23.0"`. Version bumps require regenerating GraphQL code with a matching CLI.
-- **BindJS** — the rendering engine, linked as the precompiled binary package `metabindai/bindjs-apple-binary` (`from: "1.1.7"`). The engine's source lives in the [`bindjs-apple`](https://github.com/metabindai/bindjs-apple) repository (Apache 2.0); this repo consumes precompiled releases only. To pick up a new BindJS release, bump the version in `Package.swift` and let SwiftPM update `Package.resolved`.
-- **GLTFKit2** appears in `Package.resolved` as a transitive dependency of BindJS (3D model support). Don't declare it directly.
+- **BindJS** — the rendering engine, consumed as the **source package** [`metabindai/bindjs-apple`](https://github.com/metabindai/bindjs-apple) (`from: "1.1.6"`, Apache 2.0). To pick up a new BindJS release, tag `bindjs-apple`, then bump the version in `Package.swift` and let SwiftPM update `Package.resolved`. Do not switch back to `bindjs-apple-binary` — the open-source SDK deliberately depends on open source.
+- **SVGView** and **GLTFKit2** appear in `Package.resolved` as transitive dependencies of BindJS (SVG and 3D model support; GLTFKit2 resolves as a prebuilt artifact). Don't declare either directly.
 
 ## Samples
 
