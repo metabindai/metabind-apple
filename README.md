@@ -1,10 +1,10 @@
 # Metabind for Apple
 
-The native Apple SDK for Metabind. Embed a governed AI agent in your iOS, macOS, or visionOS app, and render Metabind-managed content as native SwiftUI.
+The native Apple SDK for Metabind. Embed a governed agent in your iOS, macOS, or visionOS app, and render Metabind-managed content as native SwiftUI.
 
 ## What this is
 
-Metabind is the agentic layer for your app. It turns your existing UI and APIs into a governed agent: a standards-compliant [Model Context Protocol (MCP)](https://modelcontextprotocol.io) App that understands what each customer came for, renders real interactive UI instead of plain text, and runs both inside your own app and across Claude, ChatGPT, and every MCP host. The agent is governed, not autonomous. It follows the system prompt you author, and it can only render components you approved, validated against each tool's schema on every render.
+Metabind is the hosted platform for [Model Context Protocol (MCP)](https://modelcontextprotocol.io) Apps: you define the tools, and Metabind runs the server. It turns your existing UI and APIs into a governed agent — a standards-compliant MCP App that understands what each customer came for, renders interactive UI instead of plain text, and runs both inside your own app and across Claude, ChatGPT, and every MCP host. The agent is governed, not autonomous. It follows the system prompt you author, and it can only render components you approved, validated against each tool's schema on every render.
 
 This package is the Apple side. It ships three libraries you can adopt independently:
 
@@ -17,7 +17,29 @@ This package is the Apple side. It ships three libraries you can adopt independe
 Everything renders through BindJS as real native SwiftUI, not web views. The three libraries have different dependency footprints, so you import only the ones you use: a content-only app doesn't link the assistant, and an assistant-only app doesn't link the GraphQL client.
 
 > [!NOTE]
-> BindJS is Metabind's rendering engine. This SDK links it as a precompiled binary (`bindjs-apple-binary`). The BindJS authoring layer and React renderer are Apache 2.0; the native SwiftUI and Jetpack Compose runtimes are proprietary and ship with the SDK.
+> BindJS is Metabind's rendering engine. This SDK links it as a precompiled binary (`bindjs-apple-binary`). All of BindJS is open source under Apache 2.0: the runtime and React renderer, and the native SwiftUI and Jetpack Compose engines.
+
+## The Metabind SDKs
+
+| Platform | Repository |
+|---|---|
+| iOS, macOS, visionOS | `metabind-apple` — this repository |
+| Android | [`metabind-android`](https://github.com/metabindai/metabind-android) |
+| Web (React) | [`metabind-web`](https://github.com/metabindai/metabind-web) |
+
+One MCP App serves all three: the same tools, components, and agent configuration from a single publish, so the SDKs compose — ship the iOS assistant, the Android assistant, and the web chat surface together.
+
+**[🚀 Start free at metabind.ai](https://metabind.ai)** · **[📖 Read the docs](https://docs.metabind.ai)**
+
+## Documentation
+
+The full guides live on [docs.metabind.ai](https://docs.metabind.ai):
+
+- [iOS SDK guide](https://docs.metabind.ai/guides/assistant-sdk/ios-sdk) — install, Agent proxy vs. BYOK, the chat surface, mock mode for SwiftUI previews
+- [LLM provider configuration](https://docs.metabind.ai/guides/assistant-sdk/llm-provider-configuration) — key custody and how the Agent proxy runs the tool loop
+- [Custom host UI](https://docs.metabind.ai/guides/assistant-sdk/custom-host-ui) — replace the default chat surface with your own
+- [Content SDK guide](https://docs.metabind.ai/content/mobile-sdks/ios-sdk) — `MetabindContent` end to end
+- [BindJS reference](https://docs.metabind.ai/bindjs/introduction) — the component language tool UIs are written in
 
 ## Requirements
 
@@ -51,7 +73,7 @@ In Xcode, choose File > Add Package Dependencies, enter the repository URL, and 
 
 ## MetabindAI: embed the agent
 
-`MetabindAI` is the Assistant SDK. It embeds your Metabind agent inside your own app, calling real tools and rendering real interactive UI as native SwiftUI, governed by the same MCP App you publish to Claude, ChatGPT, and every other MCP host. One MCP App definition powers two surfaces: a hosted MCP server that every AI host can discover, and a drop-in native assistant inside your app. This library handles the second.
+`MetabindAI` is the Assistant SDK. It embeds your Metabind agent inside your own app, calling real tools and rendering interactive UI as native SwiftUI, governed by the same MCP App you publish to Claude, ChatGPT, and every other MCP host. One MCP App definition powers two surfaces: a hosted MCP server that every MCP host can discover, and a drop-in governed agent inside your own app. This library handles the second.
 
 When a tool returns a `ui` resource, the SDK fetches the BindJS bundle and renders it as native SwiftUI, the same interface a person sees in Claude or ChatGPT, running natively inside your app. Format negotiation is automatic: on the MCP `initialize` handshake, the client advertises the MIME types its registered `ContentResolver`s support (`application/vnd.bindjs+json` for native rendering, `text/html;profile=mcp-app` as a fallback) through the `io.modelcontextprotocol/ui` capability extension. The server picks the right bundle format for each call, so you never set `Accept` headers yourself.
 
@@ -80,7 +102,7 @@ struct ContentView: View {
 }
 ```
 
-One Metabind API key authenticates both the MCP server and the agent proxy. Create one in MCP App Studio, or with `metabind api-key create`.
+One Metabind API key authenticates both the MCP server and the agent proxy. Create one in MCP App Studio, or with `metabind api-key create`. In production, have your backend authenticate the user and mint the project token, rather than embedding a static token in the app.
 
 ### Quick start: Anthropic (BYOK)
 
@@ -95,6 +117,9 @@ To run the tool-use loop on device against your own Anthropic key, swap the prov
 ```
 
 Same view, same observable surface, a different conversation engine.
+
+> [!WARNING]
+> Don't ship a real Anthropic API key in a production app — anyone can extract it from the binary. BYOK is for development, internal tools, or apps where the key reaches the SDK from an authenticated user-managed source. For production, use the Agent proxy.
 
 ### Build a custom UI
 
@@ -592,4 +617,4 @@ Generated code is written to `Sources/MetabindContent/generated/`. Never edit th
 
 ## License
 
-Copyright © 2026 Yap Studios LLC. All rights reserved. See [`LICENSE`](LICENSE).
+Apache License 2.0. Copyright © 2026 Yap Studios LLC. See [`LICENSE`](LICENSE).

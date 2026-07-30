@@ -4,7 +4,7 @@ A minimal SwiftUI sample app demonstrating how to integrate the Metabind SDK int
 
 ## Overview
 
-This project provides a starting point for building iOS apps with server-driven UI powered by Metabind. It shows the essential steps for initializing the Metabind client, displaying content, and handling navigation between pages.
+This project provides a starting point for building iOS apps whose content and UI update instantly from Metabind — publish a change and it's live in the app, no release required. It shows the essential steps for initializing the Metabind client, displaying content, and handling navigation between pages.
 
 ## Requirements
 
