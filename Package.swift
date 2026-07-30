@@ -21,7 +21,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apollographql/apollo-ios", exact: "1.23.0"),
-        .package(url: "https://github.com/metabindai/bindjs-apple-binary", from: "1.1.7"),
+        .package(url: "https://github.com/metabindai/bindjs-apple.git", from: "1.1.6"),
     ],
     targets: [
         .target(
@@ -30,14 +30,14 @@ let package = Package(
                 .product(name: "Apollo", package: "apollo-ios"),
                 .product(name: "ApolloSQLite", package: "apollo-ios"),
                 .product(name: "ApolloWebSocket", package: "apollo-ios"),
-                .product(name: "BindJS", package: "bindjs-apple-binary"),
+                .product(name: "BindJS", package: "bindjs-apple"),
             ],
             exclude: ["GraphQL"]
         ),
         .target(
             name: "MCPAppsHost",
             dependencies: [
-                .product(name: "BindJS", package: "bindjs-apple-binary"),
+                .product(name: "BindJS", package: "bindjs-apple"),
             ]
         ),
         .target(

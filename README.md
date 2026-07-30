@@ -17,7 +17,7 @@ This package is the Apple side. It ships three libraries you can adopt independe
 Everything renders through BindJS as real native SwiftUI, not web views. The three libraries have different dependency footprints, so you import only the ones you use: a content-only app doesn't link the assistant, and an assistant-only app doesn't link the GraphQL client.
 
 > [!NOTE]
-> BindJS is Metabind's rendering engine. This SDK links it as a precompiled binary (`bindjs-apple-binary`). All of BindJS is open source under Apache 2.0: the runtime and React renderer, and the native SwiftUI and Jetpack Compose engines.
+> BindJS is Metabind's rendering engine. This SDK depends on it as a source package — [`metabindai/bindjs-apple`](https://github.com/metabindai/bindjs-apple), Apache 2.0 — so the code rendering your UI is open, auditable, and steppable in the debugger. All of BindJS is open source: the runtime and React renderer, and the native SwiftUI and Jetpack Compose engines. (A prebuilt XCFramework remains available at `bindjs-apple-binary` for apps that prefer a binary dependency.)
 
 ## The Metabind SDKs
 
