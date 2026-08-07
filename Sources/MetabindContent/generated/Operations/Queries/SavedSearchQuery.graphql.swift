@@ -27,6 +27,9 @@ public class SavedSearchQuery: GraphQLQuery {
     public static var __selections: [ApolloAPI.Selection] { [
       .field("savedSearch", SavedSearch?.self, arguments: ["id": .variable("id")]),
     ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      SavedSearchQuery.Data.self
+    ] }
 
     public var savedSearch: SavedSearch? { __data["savedSearch"] }
 
@@ -41,6 +44,10 @@ public class SavedSearchQuery: GraphQLQuery {
       public static var __selections: [ApolloAPI.Selection] { [
         .field("__typename", String.self),
         .fragment(SavedSearchFields.self),
+      ] }
+      public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        SavedSearchQuery.Data.SavedSearch.self,
+        SavedSearchFields.self
       ] }
 
       public var id: MetabindContent.ID { __data["id"] }

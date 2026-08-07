@@ -27,6 +27,9 @@ public struct ContentFields: MetabindContent.SelectionSet, Fragment {
     .field("lastPublishedVersion", Int?.self),
     .field("resolvedRef", ResolvedRef.self),
   ] }
+  public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+    ContentFields.self
+  ] }
 
   public var id: MetabindContent.ID { __data["id"] }
   public var typeId: MetabindContent.ID { __data["typeId"] }
@@ -52,6 +55,10 @@ public struct ContentFields: MetabindContent.SelectionSet, Fragment {
     public static var __selections: [ApolloAPI.Selection] { [
       .field("__typename", String.self),
       .fragment(ResolvedPackageRefFields.self),
+    ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      ContentFields.ResolvedRef.self,
+      ResolvedPackageRefFields.self
     ] }
 
     public var package: MetabindContent.ID { __data["package"] }

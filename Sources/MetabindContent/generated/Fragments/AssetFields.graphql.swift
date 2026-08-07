@@ -24,6 +24,9 @@ public struct AssetFields: MetabindContent.SelectionSet, Fragment {
     .field("tags", [String].self),
     .field("updatedAt", MetabindContent.DateTime.self),
   ] }
+  public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+    AssetFields.self
+  ] }
 
   public var id: MetabindContent.ID { __data["id"] }
   public var name: String { __data["name"] }

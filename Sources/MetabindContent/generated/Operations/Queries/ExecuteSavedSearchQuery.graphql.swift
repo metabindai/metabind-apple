@@ -43,6 +43,9 @@ public class ExecuteSavedSearchQuery: GraphQLQuery {
         "limit": .variable("limit")
       ]),
     ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      ExecuteSavedSearchQuery.Data.self
+    ] }
 
     public var executeSavedSearch: ExecuteSavedSearch { __data["executeSavedSearch"] }
 
@@ -58,6 +61,9 @@ public class ExecuteSavedSearchQuery: GraphQLQuery {
         .field("__typename", String.self),
         .inlineFragment(AsContentList.self),
         .inlineFragment(AsAssetList.self),
+      ] }
+      public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        ExecuteSavedSearchQuery.Data.ExecuteSavedSearch.self
       ] }
 
       public var asContentList: AsContentList? { _asInlineFragment() }
@@ -76,6 +82,10 @@ public class ExecuteSavedSearchQuery: GraphQLQuery {
           .field("data", [Datum].self),
           .field("pagination", Pagination.self),
         ] }
+        public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+          ExecuteSavedSearchQuery.Data.ExecuteSavedSearch.self,
+          ExecuteSavedSearchQuery.Data.ExecuteSavedSearch.AsContentList.self
+        ] }
 
         public var data: [Datum] { __data["data"] }
         public var pagination: Pagination { __data["pagination"] }
@@ -91,6 +101,10 @@ public class ExecuteSavedSearchQuery: GraphQLQuery {
           public static var __selections: [ApolloAPI.Selection] { [
             .field("__typename", String.self),
             .fragment(ContentFields.self),
+          ] }
+          public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+            ExecuteSavedSearchQuery.Data.ExecuteSavedSearch.AsContentList.Datum.self,
+            ContentFields.self
           ] }
 
           public var id: MetabindContent.ID { __data["id"] }
@@ -130,6 +144,9 @@ public class ExecuteSavedSearchQuery: GraphQLQuery {
             .field("hasMore", Bool.self),
             .field("limit", Int.self),
           ] }
+          public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+            ExecuteSavedSearchQuery.Data.ExecuteSavedSearch.AsContentList.Pagination.self
+          ] }
 
           public var cursor: String? { __data["cursor"] }
           public var hasMore: Bool { __data["hasMore"] }
@@ -150,6 +167,10 @@ public class ExecuteSavedSearchQuery: GraphQLQuery {
           .field("data", [Datum].self),
           .field("pagination", Pagination.self),
         ] }
+        public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+          ExecuteSavedSearchQuery.Data.ExecuteSavedSearch.self,
+          ExecuteSavedSearchQuery.Data.ExecuteSavedSearch.AsAssetList.self
+        ] }
 
         public var data: [Datum] { __data["data"] }
         public var pagination: Pagination { __data["pagination"] }
@@ -165,6 +186,10 @@ public class ExecuteSavedSearchQuery: GraphQLQuery {
           public static var __selections: [ApolloAPI.Selection] { [
             .field("__typename", String.self),
             .fragment(AssetFields.self),
+          ] }
+          public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+            ExecuteSavedSearchQuery.Data.ExecuteSavedSearch.AsAssetList.Datum.self,
+            AssetFields.self
           ] }
 
           public var id: MetabindContent.ID { __data["id"] }
@@ -198,6 +223,9 @@ public class ExecuteSavedSearchQuery: GraphQLQuery {
             .field("cursor", String?.self),
             .field("hasMore", Bool.self),
             .field("limit", Int.self),
+          ] }
+          public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+            ExecuteSavedSearchQuery.Data.ExecuteSavedSearch.AsAssetList.Pagination.self
           ] }
 
           public var cursor: String? { __data["cursor"] }

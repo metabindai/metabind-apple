@@ -20,7 +20,7 @@ let package = Package(
         .library(name: "MetabindAI", targets: ["MetabindAI"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apollographql/apollo-ios", exact: "1.23.0"),
+        .package(url: "https://github.com/apollographql/apollo-ios", exact: "1.25.7"),
         .package(url: "https://github.com/metabindai/bindjs-apple.git", from: "1.1.6"),
     ],
     targets: [

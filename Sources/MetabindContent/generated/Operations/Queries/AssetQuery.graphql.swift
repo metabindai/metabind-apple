@@ -27,6 +27,9 @@ public class AssetQuery: GraphQLQuery {
     public static var __selections: [ApolloAPI.Selection] { [
       .field("asset", Asset?.self, arguments: ["id": .variable("id")]),
     ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      AssetQuery.Data.self
+    ] }
 
     public var asset: Asset? { __data["asset"] }
 
@@ -41,6 +44,10 @@ public class AssetQuery: GraphQLQuery {
       public static var __selections: [ApolloAPI.Selection] { [
         .field("__typename", String.self),
         .fragment(AssetFields.self),
+      ] }
+      public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        AssetQuery.Data.Asset.self,
+        AssetFields.self
       ] }
 
       public var id: MetabindContent.ID { __data["id"] }
