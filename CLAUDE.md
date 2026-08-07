@@ -39,11 +39,11 @@ apollo-ios-cli generate
 
 - Generated code lands in `Sources/MetabindContent/generated/` and is checked in. **Never edit files in `generated/` by hand.**
 - The `GraphQL/` directory is excluded from the target build (`exclude: ["GraphQL"]` in `Package.swift`); only the generated code compiles. Don't "fix" the exclusion.
-- `apollo-ios-cli` is not checked into this repository. Use a CLI build that matches the pinned Apollo iOS version (exactly 1.23.0 in `Package.swift`).
+- `apollo-ios-cli` is not checked into this repository. Use a CLI build that matches the pinned Apollo iOS version (exactly 1.25.7 in `Package.swift`).
 
 ## Dependencies
 
-- **Apollo iOS** — pinned `exact: "1.23.0"`. Version bumps require regenerating GraphQL code with a matching CLI.
+- **Apollo iOS** — pinned `exact: "1.25.7"`. Version bumps require regenerating GraphQL code with a matching CLI. Staying on the 1.x line is deliberate: Apollo 2.x removes the `ApolloInterceptor` / `RequestChain` API that `AuthenticationInterceptor.swift` is built on, and changes the `ApolloClient` transport and `CachePolicy` surface that `MetabindClient.swift` uses. That migration is separate work, not a version bump.
 - **BindJS** — the rendering engine, consumed as the **source package** [`metabindai/bindjs-apple`](https://github.com/metabindai/bindjs-apple) (`from: "1.1.6"`, Apache 2.0). To pick up a new BindJS release, tag `bindjs-apple`, then bump the version in `Package.swift` and let SwiftPM update `Package.resolved`. Do not switch back to `bindjs-apple-binary` — the open-source SDK deliberately depends on open source.
 - **SVGView** and **GLTFKit2** appear in `Package.resolved` as transitive dependencies of BindJS (SVG and 3D model support; GLTFKit2 resolves as a prebuilt artifact). Don't declare either directly.
 

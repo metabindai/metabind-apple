@@ -17,6 +17,9 @@ public struct PackageDependencyFields: MetabindContent.SelectionSet, Fragment {
     .field("projectId", MetabindContent.ID.self),
     .field("version", String.self),
   ] }
+  public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+    PackageDependencyFields.self
+  ] }
 
   public var projectId: MetabindContent.ID { __data["projectId"] }
   public var version: String { __data["version"] }
