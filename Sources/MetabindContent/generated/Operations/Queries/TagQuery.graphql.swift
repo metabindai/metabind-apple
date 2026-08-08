@@ -27,6 +27,9 @@ public class TagQuery: GraphQLQuery {
     public static var __selections: [ApolloAPI.Selection] { [
       .field("tag", Tag?.self, arguments: ["id": .variable("id")]),
     ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      TagQuery.Data.self
+    ] }
 
     public var tag: Tag? { __data["tag"] }
 
@@ -41,6 +44,10 @@ public class TagQuery: GraphQLQuery {
       public static var __selections: [ApolloAPI.Selection] { [
         .field("__typename", String.self),
         .fragment(TagFields.self),
+      ] }
+      public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        TagQuery.Data.Tag.self,
+        TagFields.self
       ] }
 
       public var id: MetabindContent.ID { __data["id"] }

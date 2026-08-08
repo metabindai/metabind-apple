@@ -19,6 +19,9 @@ public struct ComponentFields: MetabindContent.SelectionSet, Fragment {
     .field("compiled", String.self),
     .field("updatedAt", MetabindContent.DateTime.self),
   ] }
+  public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+    ComponentFields.self
+  ] }
 
   public var id: MetabindContent.ID { __data["id"] }
   public var name: String { __data["name"] }

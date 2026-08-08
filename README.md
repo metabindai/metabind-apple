@@ -612,7 +612,7 @@ Generated code is written to `Sources/MetabindContent/generated/`. Never edit th
 
 ## Dependencies
 
-- Apollo iOS 1.23.0, the GraphQL client, with WebSocket and SQLite support. Used by `MetabindContent`.
+- Apollo iOS 1.25.7, the GraphQL client, with WebSocket and SQLite support. Used by `MetabindContent`.
 - BindJS, the native rendering engine, consumed as a source package from [`metabindai/bindjs-apple`](https://github.com/metabindai/bindjs-apple). Used by all three libraries.
 
 ## License
