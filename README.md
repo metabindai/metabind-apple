@@ -75,7 +75,7 @@ In Xcode, choose File > Add Package Dependencies, enter the repository URL, and 
 
 `MetabindAI` is the Assistant SDK. It embeds your Metabind agent inside your own app, calling real tools and rendering interactive UI as native SwiftUI, governed by the same MCP App you publish to Claude, ChatGPT, and every other MCP host. One MCP App definition powers two surfaces: a hosted MCP server that every MCP host can discover, and a drop-in governed agent inside your own app. This library handles the second.
 
-When a tool returns a `ui` resource, the SDK fetches the BindJS bundle and renders it as native SwiftUI, the same interface a person sees in Claude or ChatGPT, running natively inside your app. Format negotiation is automatic: on the MCP `initialize` handshake, the client advertises the MIME types its registered `ContentResolver`s support (`application/vnd.bindjs+json` for native rendering, `text/html;profile=mcp-app` as a fallback) through the `io.modelcontextprotocol/ui` capability extension. The server picks the right bundle format for each call, so you never set `Accept` headers yourself.
+When a tool returns a `ui` resource, the SDK fetches the BindJS bundle and renders it as native SwiftUI, the same interface a person sees in Claude or ChatGPT, running natively inside your app. Protocol and format negotiation are automatic. With MCP 2026-07-28 servers, the client uses stateless requests and includes its supported `ContentResolver` MIME types with every request. With older servers, it falls back to the `initialize` handshake and session transport. The server picks the right bundle format for each call, so you never set `Accept` headers yourself.
 
 ### Quick start: agent proxy
 
