@@ -126,11 +126,25 @@ public struct MCPAppContent: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                         }
+                    case .audio:
+                        EmptyView()
                     case .resource(_, _, let text):
                         if let text {
                             Text(text)
                                 .textSelection(.enabled)
                                 .font(.caption.monospaced())
+                        }
+                    case .resourceBlob(_, _, let blob):
+                        if let text = String(data: blob, encoding: .utf8) {
+                            Text(text)
+                                .textSelection(.enabled)
+                                .font(.caption.monospaced())
+                        }
+                    case .resourceLink(let name, let title, let uri, _, _, _):
+                        if let destination = URL(string: uri) {
+                            Link(title ?? name, destination: destination)
+                        } else {
+                            Text(title ?? name)
                         }
                     }
                 }
