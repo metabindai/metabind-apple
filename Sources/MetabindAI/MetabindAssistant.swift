@@ -44,6 +44,23 @@ public final class MetabindAssistant {
     /// System prompt prepended to every LLM request.
     public var systemPrompt: String?
 
+    /// Follow-up questions the model attached to the card it just rendered,
+    /// in the order it suggested them. Empty until a tool call carrying them
+    /// streams in, and cleared at the start of each new message.
+    ///
+    /// These ride along as an argument on a tool call the model is already
+    /// making, so they cost no extra round trip — see ``nextStepsArgument``.
+    public private(set) var nextSteps: [String] = []
+
+    /// Tool argument read into ``nextSteps``. The tool itself ignores the
+    /// argument; it exists so the model has somewhere to put suggestions.
+    ///
+    /// Set to `nil` for servers that don't declare it. Note the argument must
+    /// be declared in the tool's published input schema either way — a server
+    /// validating `additionalProperties: false` rejects a call carrying an
+    /// argument it never advertised.
+    public var nextStepsArgument: String? = "nextSteps"
+
     /// Maximum tool-use loop iterations per user message.
     public var maxToolIterations = 10
 
@@ -55,6 +72,9 @@ public final class MetabindAssistant {
     private var toolUIMap: [String: String] = [:]
     private var llmTools: [LLMTool] = []
     private var activeSessions: [String: ManualMCPAppSession] = [:]
+
+    /// When each live session was last handed a partial, for ``shouldFeed(_:)``.
+    private var lastFedAt: [String: Date] = [:]
     private var currentTask: Task<Void, Never>?
 
     /// Structured context awaiting injection on the next ``send(_:)`` call.
@@ -107,6 +127,58 @@ public final class MetabindAssistant {
 
     // MARK: - Public API
 
+    /// Minimum spacing between partial feeds to one session.
+    ///
+    /// Providers emit tool input in ~7-character fragments, so a card that
+    /// takes 1,900 bytes to describe arrives in roughly 290 of them. Feeding
+    /// every one re-evaluates the hosting view — and rebuilds the BindJS tree —
+    /// 290 times in a few seconds, which is where a self-loading card lost its
+    /// `useState` and flipped back to its spinner. This is invisible while the
+    /// card is off screen; presenting early is what made it matter.
+    ///
+    /// 100ms is about ten updates a second: still typing, an order of magnitude
+    /// less churn. The final arguments always land, throttle or not.
+    private static let partialFeedInterval: TimeInterval = 0.1
+
+    private func shouldFeed(_ sessionID: String) -> Bool {
+        let now = Date()
+        if let last = lastFedAt[sessionID], now.timeIntervalSince(last) < Self.partialFeedInterval {
+            return false
+        }
+        lastFedAt[sessionID] = now
+        return true
+    }
+
+    /// Reads ``nextStepsArgument`` out of a tool call's arguments, if present.
+    ///
+    /// Called on every partial parse, so it has to tolerate a half-streamed
+    /// array: entries only grow and never shrink back, which keeps the pill
+    /// row from flickering as the model types the last suggestion. A tool call
+    /// that omits the argument leaves whatever the previous one supplied.
+    private func absorbNextSteps(from arguments: JSONValue) {
+        guard let key = nextStepsArgument,
+              let raw = arguments[key]?.arrayValue else { return }
+
+        let steps = raw.compactMap { $0.stringValue }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard steps.count >= nextSteps.count, steps != nextSteps else { return }
+        nextSteps = steps
+    }
+
+    /// Drops every cached `ui://` resource and the decoded BindJS package, so
+    /// the next render refetches and reparses from the server.
+    ///
+    /// Useful after publishing new component versions, and for a debug "reset"
+    /// affordance. Does nothing to the conversation.
+    public func clearResourceCaches() async {
+        if let client = server as? MCPAppsClient {
+            await client.clearResourceCache()
+        }
+        MCPAppsCaches.invalidateBindJSPackage()
+    }
+
     /// Discover tools from the MCP server.
     ///
     /// Called automatically when the first message is sent, but can be called
@@ -157,6 +229,9 @@ public final class MetabindAssistant {
         llmHistory.append(.user(modelText))
         isProcessing = true
         activeSessions.removeAll()
+        lastFedAt.removeAll()
+        // The old card's follow-ups don't belong under the new one.
+        nextSteps = []
 
         currentTask?.cancel()
         currentTask = Task {
@@ -194,6 +269,7 @@ public final class MetabindAssistant {
         conversation.clear()
         llmHistory.removeAll()
         activeSessions.removeAll()
+        lastFedAt.removeAll()
         pendingContext.removeAll()
         _hostBridge = nil
         // Fire-and-forget — reset is synchronous from the UI's perspective,
@@ -466,9 +542,12 @@ public final class MetabindAssistant {
                 // a valid JSONValue at most fragment boundaries. The authoritative
                 // value still arrives via `toolCallArgumentsFinal`.
                 if let acc = toolAccumulators[index],
-                   let session = activeSessions[acc.id],
                    let partial = PartialJSON.parse(acc.jsonFragment) {
-                    session.feed(partial)
+                    // Pills fill in as the model types them, same as the card.
+                    absorbNextSteps(from: partial)
+                    if let session = activeSessions[acc.id], shouldFeed(acc.id) {
+                        session.feed(partial)
+                    }
                 }
 
             case .toolCallArgumentsFinal(let index, let args):
@@ -477,11 +556,17 @@ public final class MetabindAssistant {
                     break
                 }
                 toolAccumulators[index]?.canonicalArgs = args
+                absorbNextSteps(from: args)
+                if let acc = toolAccumulators[index] {
+                    lastFedAt[acc.id] = nil
+                }
                 if let acc = toolAccumulators[index],
                    let session = activeSessions[acc.id] {
                     // Surface the canonical args to the live BindJS view —
-                    // matters when partials were absent or didn't parse.
-                    session.feed(args)
+                    // matters when partials were absent or didn't parse — and
+                    // mark the stream closed so a self-loading card knows its
+                    // props are finally trustworthy.
+                    session.finalizeArguments(args)
                 }
 
             case .contentBlockStop(let index):
