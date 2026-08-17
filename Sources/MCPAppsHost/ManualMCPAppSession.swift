@@ -35,7 +35,19 @@ public final class ManualMCPAppSession: MCPAppSession {
     /// Stream partial tool arguments to the view.
     /// Call 0..n times. Each call updates the view progressively.
     public func feed(_ partialArguments: JSONValue) {
+        guard !argumentsComplete else { return }
         self.partialArguments = partialArguments
+    }
+
+    /// Deliver the complete arguments and stop accepting partials.
+    ///
+    /// Sets ``MCPAppSession/argumentsComplete``, which is what tells a
+    /// self-loading card its props are finally trustworthy. Later `feed` calls
+    /// are ignored, so a straggling fragment cannot walk a settled card back
+    /// into a partial state.
+    public func finalizeArguments(_ arguments: JSONValue) {
+        self.partialArguments = arguments
+        self.argumentsComplete = true
     }
 
     /// Deliver the final tool result. Transitions to .completed(result).

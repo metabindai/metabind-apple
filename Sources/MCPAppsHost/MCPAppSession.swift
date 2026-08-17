@@ -41,6 +41,16 @@ public class MCPAppSession: Identifiable {
     /// render the tool UI progressively.
     public internal(set) var partialArguments: JSONValue?
 
+    /// Whether ``partialArguments`` has stopped changing — the model has
+    /// finished typing this tool call.
+    ///
+    /// A card that loads its own data needs this. Mid-stream its props are a
+    /// prefix of the truth: a `period` that hasn't arrived yet reads as absent,
+    /// so fetching against it queries the wrong window and then caches that
+    /// answer. Surfaced to components as the `argumentsComplete` environment
+    /// flag so they can hold a loading state until their inputs are real.
+    public internal(set) var argumentsComplete: Bool = false
+
     /// Sendable model-layer phase. No view content.
     public enum Phase: Sendable {
         case loading
