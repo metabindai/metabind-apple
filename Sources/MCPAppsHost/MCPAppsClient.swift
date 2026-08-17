@@ -59,8 +59,10 @@ public actor MCPAppsClient: MCPServer {
         /// Prefetching moves it into the window where the model is still
         /// generating, so the render finds a warm cache.
         ///
-        /// Set to `false` for hosts that list tools without intending to render
-        /// them — the fetches are wasted bandwidth there.
+        /// Off by default. Warming every `ui://` resource is the right trade for
+        /// a host that is about to render cards, and the wrong one for a host
+        /// that merely lists tools — the fetches are megabytes of wasted
+        /// bandwidth there. Opting in is a decision only the host can make.
         public var prefetchUIResources: Bool
         /// Custom URLSession. Provide your own for cert pinning, proxy, etc.
         public var urlSession: URLSession
@@ -70,7 +72,7 @@ public actor MCPAppsClient: MCPServer {
             maxCacheEntries: Int = 50,
             maxRetries: Int = 2,
             retryBaseDelay: TimeInterval = 0.5,
-            prefetchUIResources: Bool = true,
+            prefetchUIResources: Bool = false,
             urlSession: URLSession = .shared
         ) {
             self.requestTimeout = requestTimeout

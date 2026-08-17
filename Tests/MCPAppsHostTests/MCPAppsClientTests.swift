@@ -177,7 +177,7 @@ struct MCPAppsClientTests {
             #expect(config.maxCacheEntries == 50)
             #expect(config.maxRetries == 2)
             #expect(config.retryBaseDelay == 0.5)
-            #expect(config.prefetchUIResources == true)
+            #expect(config.prefetchUIResources == false)
         }
 
         @Test func customValues() {
@@ -545,7 +545,7 @@ struct MCPAppsClientTests {
             registerInitHandlers()
             Self.registerTools()
 
-            let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+            let client = MCPAppsClient(url: mockURL, configuration: .init(prefetchUIResources: true, urlSession: mockSession()))
             _ = try await client.listTools()
             await Self.waitForReads(2)
 

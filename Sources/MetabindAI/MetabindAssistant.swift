@@ -115,13 +115,16 @@ public final class MetabindAssistant {
     ///   - serverHeaders: HTTP headers for the MCP server (e.g., authorization).
     ///   - provider: The LLM provider.
     ///   - systemPrompt: Optional system prompt.
+    ///   - configuration: Client options — timeouts, caching, and whether to
+    ///     warm `ui://` resources ahead of the first render.
     public convenience init(
         serverURL: URL,
         serverHeaders: [String: String] = [:],
         provider: any LLMProvider,
-        systemPrompt: String? = nil
+        systemPrompt: String? = nil,
+        configuration: MCPAppsClient.Configuration = .init()
     ) {
-        let client = MCPAppsClient(url: serverURL, headers: serverHeaders)
+        let client = MCPAppsClient(url: serverURL, headers: serverHeaders, configuration: configuration)
         self.init(server: client, provider: provider, systemPrompt: systemPrompt)
     }
 
