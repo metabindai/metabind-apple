@@ -365,9 +365,16 @@ public class MCPAppSession: Identifiable {
         }
 
         log.info("[\(self.toolName, privacy: .public)] Fetching resource: \(uri, privacy: .public)")
+        // How long the card sat waiting for its own definition before it could
+        // draw anything. This is the whole point of prefetching: warm, it is a
+        // dictionary lookup; cold, it is a few hundred KB over the wire while
+        // the user looks at a spinner. Logged in ms so the two can be compared
+        // rather than argued about.
+        let fetchStarted = Date()
         let resource = try await server.readResource(uri: uri)
         try Task.checkCancellation()
-        log.info("[\(self.toolName, privacy: .public)] Resource fetched: mimeType=\(resource.mimeType, privacy: .public)")
+        let waitedMs = Int(Date().timeIntervalSince(fetchStarted) * 1000)
+        log.info("[\(self.toolName, privacy: .public)] Resource fetched: mimeType=\(resource.mimeType, privacy: .public) waited=\(waitedMs, privacy: .public)ms")
 
         guard let resolver = resolvers.first(where: { $0.canResolve(mimeType: resource.mimeType) }) else {
             log.error("[\(self.toolName, privacy: .public)] No resolver for mimeType=\(resource.mimeType, privacy: .public)")
