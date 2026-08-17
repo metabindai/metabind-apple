@@ -177,6 +177,7 @@ struct MCPAppsClientTests {
             #expect(config.maxCacheEntries == 50)
             #expect(config.maxRetries == 2)
             #expect(config.retryBaseDelay == 0.5)
+            #expect(config.prefetchUIResources == true)
         }
 
         @Test func customValues() {
@@ -497,6 +498,98 @@ struct MCPAppsClientTests {
             #expect(r1.mimeType == "application/json")
             #expect(r2.text == r1.text)
             #expect(fetchCount == 1) // Only one network call — second was cached
+        }
+    }
+
+    // MARK: - Prefetch
+
+    @Suite("Prefetch")
+    struct PrefetchTests {
+        init() { MockURLProtocol.reset() }
+
+        /// Two tools carrying a ui:// resource, one without.
+        static func registerTools() {
+            MockURLProtocol.handlers["tools/list"] = { _ in
+                let tools: [[String: Any]] = [
+                    ["name": "card_a", "_meta": ["ui": ["resourceUri": "ui://test/a"]]],
+                    ["name": "card_b", "_meta": ["ui": ["resourceUri": "ui://test/b"]]],
+                    ["name": "data_only"]
+                ]
+                let body: [String: Any] = ["jsonrpc": "2.0", "id": 2, "result": ["tools": tools]]
+                return (200, [:], try! JSONSerialization.data(withJSONObject: body))
+            }
+            MockURLProtocol.handlers["resources/read"] = { req in
+                let params = (req.json?["params"] as? [String: Any]) ?? [:]
+                let uri = params["uri"] as? String ?? "ui://test/unknown"
+                let result: [String: Any] = [
+                    "contents": [["uri": uri, "mimeType": "application/vnd.bindjs+json", "text": "{\"ok\":true}"]]
+                ]
+                let body: [String: Any] = ["jsonrpc": "2.0", "id": 3, "result": result]
+                return (200, [:], try! JSONSerialization.data(withJSONObject: body))
+            }
+        }
+
+        static func readCount() -> Int {
+            MockURLProtocol.requestLog.filter { $0.method == "resources/read" }.count
+        }
+
+        /// Prefetch is fire-and-forget, so let it settle before asserting.
+        static func waitForReads(_ target: Int, timeout: TimeInterval = 2) async {
+            let deadline = Date().addingTimeInterval(timeout)
+            while Date() < deadline && readCount() < target {
+                try? await Task.sleep(nanoseconds: 5_000_000)
+            }
+        }
+
+        @Test func listToolsWarmsUIResources() async throws {
+            registerInitHandlers()
+            Self.registerTools()
+
+            let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+            _ = try await client.listTools()
+            await Self.waitForReads(2)
+
+            // card_a and card_b only — data_only has no ui:// resource to warm.
+            #expect(Self.readCount() == 2)
+
+            // The render that follows finds a warm cache instead of a download.
+            _ = try await client.readResource(uri: "ui://test/a")
+            #expect(Self.readCount() == 2)
+        }
+
+        @Test func prefetchDisabledLeavesCacheCold() async throws {
+            registerInitHandlers()
+            Self.registerTools()
+
+            let client = MCPAppsClient(
+                url: mockURL,
+                configuration: .init(prefetchUIResources: false, urlSession: mockSession())
+            )
+            _ = try await client.listTools()
+            try await Task.sleep(nanoseconds: 100_000_000)
+
+            #expect(Self.readCount() == 0)
+
+            _ = try await client.readResource(uri: "ui://test/a")
+            #expect(Self.readCount() == 1)
+        }
+
+        @Test func concurrentReadsShareOneFetch() async throws {
+            registerInitHandlers()
+            Self.registerTools()
+
+            let client = MCPAppsClient(
+                url: mockURL,
+                configuration: .init(prefetchUIResources: false, urlSession: mockSession())
+            )
+            _ = try await client.listTools()
+
+            async let first = client.readResource(uri: "ui://test/a")
+            async let second = client.readResource(uri: "ui://test/a")
+            let (a, b) = try await (first, second)
+
+            #expect(a.text == b.text)
+            #expect(Self.readCount() == 1) // second joined the in-flight request
         }
     }
 

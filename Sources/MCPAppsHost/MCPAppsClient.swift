@@ -33,6 +33,10 @@ public actor MCPAppsClient: MCPServer {
     /// LRU resource cache keyed by URI.
     private var resourceCache: OrderedCache<String, ResourceContent>
 
+    /// Resource reads currently in flight, keyed by URI. A prefetch and a real
+    /// render of the same card share one request rather than racing to issue two.
+    private var inFlightReads: [String: Task<ResourceContent, any Error>] = [:]
+
     /// Protocol versions this client can accept.
     private static let supportedVersions: Set<String> = ["2025-03-26", "2024-11-05"]
     private static let preferredVersion = "2025-03-26"
@@ -47,6 +51,17 @@ public actor MCPAppsClient: MCPServer {
         public var maxRetries: Int
         /// Base delay for exponential backoff. Doubled on each retry.
         public var retryBaseDelay: TimeInterval
+        /// Warm the resource cache in the background as soon as `listTools()`
+        /// discovers which `ui://` resources the server offers.
+        ///
+        /// A card's resource is otherwise fetched the first time the model asks
+        /// for that card, putting the download on the critical path of the turn.
+        /// Prefetching moves it into the window where the model is still
+        /// generating, so the render finds a warm cache.
+        ///
+        /// Set to `false` for hosts that list tools without intending to render
+        /// them — the fetches are wasted bandwidth there.
+        public var prefetchUIResources: Bool
         /// Custom URLSession. Provide your own for cert pinning, proxy, etc.
         public var urlSession: URLSession
 
@@ -55,12 +70,14 @@ public actor MCPAppsClient: MCPServer {
             maxCacheEntries: Int = 50,
             maxRetries: Int = 2,
             retryBaseDelay: TimeInterval = 0.5,
+            prefetchUIResources: Bool = true,
             urlSession: URLSession = .shared
         ) {
             self.requestTimeout = requestTimeout
             self.maxCacheEntries = maxCacheEntries
             self.maxRetries = maxRetries
             self.retryBaseDelay = retryBaseDelay
+            self.prefetchUIResources = prefetchUIResources
             self.urlSession = urlSession
         }
     }
@@ -144,6 +161,35 @@ public actor MCPAppsClient: MCPServer {
             return cached
         }
 
+        // A prefetch may already be fetching this URI. Wait on it rather than
+        // issuing a second request for the same bytes.
+        if let inFlight = inFlightReads[uri] {
+            log.info("resources/read → \(uri) (in flight)")
+            return try await inFlight.value
+        }
+
+        let task = Task { try await self.performResourceRead(uri: uri) }
+        inFlightReads[uri] = task
+        defer { inFlightReads[uri] = nil }
+        return try await task.value
+    }
+
+    /// Warms the resource cache for `uris` without blocking the caller.
+    ///
+    /// Each URI is fetched at most once — already-cached and already-in-flight
+    /// URIs are skipped, and failures are swallowed, since a prefetch miss just
+    /// means the later `readResource` pays the fetch it would have paid anyway.
+    public func prefetchResources(_ uris: [String]) {
+        let pending = uris.filter { !resourceCache.contains($0) && inFlightReads[$0] == nil }
+        guard !pending.isEmpty else { return }
+
+        log.info("prefetching \(pending.count) UI resource(s)")
+        for uri in pending {
+            Task { _ = try? await self.readResource(uri: uri) }
+        }
+    }
+
+    private func performResourceRead(uri: String) async throws -> ResourceContent {
         log.info("resources/read → \(uri)")
         let params: [String: Any] = ["uri": uri]
         let response = try await sendRequest(method: "resources/read", params: params)
@@ -214,6 +260,11 @@ public actor MCPAppsClient: MCPServer {
         } while cursor != nil
 
         log.info("tools/list ← \(allDefs.count) tool(s)")
+
+        if configuration.prefetchUIResources {
+            prefetchResources(allDefs.compactMap { $0.ui?.resourceUri })
+        }
+
         return allDefs
     }
 
@@ -484,6 +535,11 @@ struct OrderedCache<Key: Hashable, Value>: Sendable where Key: Sendable, Value: 
 
     init(maxEntries: Int) {
         self.maxEntries = maxEntries
+    }
+
+    /// Membership test that leaves the LRU order untouched.
+    func contains(_ key: Key) -> Bool {
+        storage[key] != nil
     }
 
     mutating func get(_ key: Key) -> Value? {
