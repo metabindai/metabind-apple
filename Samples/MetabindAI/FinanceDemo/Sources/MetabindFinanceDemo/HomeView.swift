@@ -48,8 +48,11 @@ struct HomeView: View {
             }
         }
         .task(id: ObjectIdentifier(assistant)) {
-            wireHostBridge()
-            router.onReset = wireHostBridge
+            Self.wireHostBridge(assistant: assistant, router: router, openURL: openURL)
+            router.onReset = { [weak assistant, weak router] in
+                guard let assistant, let router else { return }
+                Self.wireHostBridge(assistant: assistant, router: router, openURL: openURL)
+            }
             router.start()
         }
         .onChange(of: assistant.conversation.messages.count) { _, _ in router.sync() }
@@ -163,9 +166,12 @@ struct HomeView: View {
     /// Handlers the assistant can't supply itself because they need SwiftUI
     /// environment. `MetabindAssistantView` does this for you; a custom UI
     /// has to do it by hand.
-    private func wireHostBridge() {
+    private static func wireHostBridge(
+        assistant: MetabindAssistant,
+        router: AnswerRouter,
+        openURL: OpenURLAction
+    ) {
         let bridge = assistant.hostBridge
-        let openURL = openURL
         bridge.handlers.onMessage = { [weak router] message in
             let text = message.content.compactMap { block -> String? in
                 if case .text(let text) = block { return text }
@@ -180,9 +186,9 @@ struct HomeView: View {
                 }
             }
         }
-        bridge.handlers.onDisplayMode = { mode in
+        bridge.handlers.onDisplayMode = { [weak router] mode in
             MainActor.assumeIsolated {
-                if mode == .fullscreen { router.requestFullscreen() }
+                if mode == .fullscreen { router?.requestFullscreen() }
             }
             return mode
         }
