@@ -77,6 +77,9 @@ final class AnswerRouter {
     /// The delivered answer whose prose may still be streaming in.
     private var liveAnswerID: Answer.ID?
 
+    /// Waits for the first rendered card to have trustworthy props.
+    private var presentationTask: Task<Void, Never>?
+
     /// Called after a thread ends and the assistant is reset. The view uses
     /// it to re-attach host-bridge handlers to the assistant's new bridge.
     var onReset: (() -> Void)?
@@ -132,6 +135,8 @@ final class AnswerRouter {
     }
 
     func cancelPending() {
+        presentationTask?.cancel()
+        presentationTask = nil
         assistant.cancel()
         // Mark it handled on the way out, or the next `sync()` would see an
         // unaccounted-for user message and adopt the turn straight back.
@@ -216,8 +221,12 @@ final class AnswerRouter {
             // seconds to type, all of it spent behind a closed sheet. Wait
             // for the first real props instead, and let the rest fill in
             // where the user can watch it.
-            Task { @MainActor in
-                await self.awaitPresentable(session)
+            presentationTask?.cancel()
+            presentationTask = Task { @MainActor [weak self] in
+                let isPresentable = await Self.awaitPresentable(session) {
+                    self != nil
+                }
+                guard isPresentable, let self else { return }
                 self.deliver(id)
             }
             return
@@ -246,21 +255,29 @@ final class AnswerRouter {
     /// resolves, which happens before any argument has arrived, so `.active`
     /// alone still means an empty card. One parsed property is the earliest
     /// point the card draws something true.
-    private func awaitPresentable(_ session: MCPAppSession) async {
-        while true {
+    private static func awaitPresentable(
+        _ session: MCPAppSession,
+        while ownerExists: @MainActor () -> Bool
+    ) async -> Bool {
+        while ownerExists(), !Task.isCancelled {
             switch session.phase {
             case .completed, .failed, .cancelled:
-                return
+                return true
             case .active:
-                if let props = session.partialArguments?.objectValue, !props.isEmpty { return }
+                if let props = session.partialArguments?.objectValue, !props.isEmpty { return true }
             case .loading:
                 break
             }
             // Polling rather than observation: props update many times a second
             // during a stream, and a 50ms floor keeps the sheet from animating
             // in on the very first fragment of a card that is about to fail.
-            try? await Task.sleep(for: .milliseconds(50))
+            do {
+                try await Task.sleep(for: .milliseconds(50))
+            } catch {
+                return false
+            }
         }
+        return false
     }
 
     /// Picks up a turn that started without going through ``ask(_:)``.
@@ -284,6 +301,8 @@ final class AnswerRouter {
 
     private func deliver(_ id: Answer.ID) {
         guard var answer = pending, answer.id == id else { return }
+        presentationTask?.cancel()
+        presentationTask = nil
         pending = nil
         handledUpTo = answer.startIndex
         answer.prose = prose(from: answer.startIndex)
