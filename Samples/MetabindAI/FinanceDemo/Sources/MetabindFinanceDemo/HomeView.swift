@@ -166,6 +166,13 @@ struct HomeView: View {
     private func wireHostBridge() {
         let bridge = assistant.hostBridge
         let openURL = openURL
+        bridge.handlers.onMessage = { [weak router] message in
+            let text = message.content.compactMap { block -> String? in
+                if case .text(let text) = block { return text }
+                return nil
+            }.joined(separator: "\n")
+            router?.ask(text)
+        }
         bridge.handlers.onOpenLink = { url in
             await withCheckedContinuation { continuation in
                 openURL(url) { accepted in

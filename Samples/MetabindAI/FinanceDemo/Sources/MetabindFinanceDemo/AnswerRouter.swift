@@ -108,7 +108,10 @@ final class AnswerRouter {
     /// Ask a question. From the home rail this starts a thread; from inside
     /// the sheet it extends the one that's open.
     func ask(_ question: String) {
-        pendingIsHome = false
+        // A question queued behind the home load must not change where the
+        // in-flight home answer lands. `flushQueue()` calls back here once the
+        // current turn finishes, at which point it becomes a thread answer.
+        if !isBusy { pendingIsHome = false }
         // The chips let you jump back to an earlier answer, but the model's
         // history is linear — left alone it would read "that" as the most
         // recent turn, not the one on screen. Naming the focused answer
