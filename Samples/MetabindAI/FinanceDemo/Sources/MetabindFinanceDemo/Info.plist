@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>FinanceDemoAPIKey</key>
+    <string>$(FINANCE_DEMO_API_KEY)</string>
+    <key>FinanceDemoOrgId</key>
+    <string>$(FINANCE_DEMO_ORG_ID)</string>
+    <key>FinanceDemoProjectId</key>
+    <string>$(FINANCE_DEMO_PROJECT_ID)</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+</dict>
+</plist>

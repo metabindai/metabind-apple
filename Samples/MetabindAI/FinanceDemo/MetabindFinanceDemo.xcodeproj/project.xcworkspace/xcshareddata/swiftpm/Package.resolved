@@ -1,0 +1,42 @@
+{
+  "originHash" : "9e1a5a35673b5bc0d033609ef93a4e328415a9a551c899e2e932f2684d2d27cd",
+  "pins" : [
+    {
+      "identity" : "apollo-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apollographql/apollo-ios",
+      "state" : {
+        "revision" : "d591c1dd55824867877cff4f6551fe32983d7f51",
+        "version" : "1.23.0"
+      }
+    },
+    {
+      "identity" : "bindjs-apple",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/metabindai/bindjs-apple.git",
+      "state" : {
+        "revision" : "e771ba16b1bad6b89ab4c8e210d2b40e638669e2",
+        "version" : "1.1.6"
+      }
+    },
+    {
+      "identity" : "gltfkit2",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/warrenm/GLTFKit2",
+      "state" : {
+        "revision" : "c4509232470777e51ecffa626597ff9b4da170f5",
+        "version" : "0.5.14"
+      }
+    },
+    {
+      "identity" : "svgview",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/yapstudios/SVGView.git",
+      "state" : {
+        "revision" : "5266e544b93ce541b195d21be3a917f7d5fcbc87",
+        "version" : "1.0.7"
+      }
+    }
+  ],
+  "version" : 3
+}

@@ -1,0 +1,10 @@
+.build/
+build/
+.swiftpm/
+.DS_Store
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+.vscode/
+*.env
+Config/Local.xcconfig
