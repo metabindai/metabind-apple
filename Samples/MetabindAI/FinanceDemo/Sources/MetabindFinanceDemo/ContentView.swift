@@ -66,7 +66,7 @@ struct ContentView: View {
     }
 
     /// Forgets the key and drops back to `keyEntry`. The reset is sticky, so a
-    /// relaunch doesn't quietly reinstate the built-in demo key.
+    /// relaunch doesn't quietly reinstate the configured demo key.
     private func resetAPIKey() {
         KeychainKey.delete()
         assistant = nil
@@ -100,19 +100,19 @@ private enum KeychainKey {
     static let account = "metabind-api-key"
 
     /// Optional configured key so private demo builds run without setup.
-    static let demoKey = Bundle.main.infoDictionary?["FinanceDemoAPIKey"] as? String ?? ""
+    static let configuredKey = Bundle.main.infoDictionary?["FinanceDemoAPIKey"] as? String ?? ""
 
-    /// Set once "Reset API Key" runs, so the demo key stops seeding the field.
+    /// Set once "Reset API Key" runs, so the configured key stops seeding the field.
     /// Without it the reset would appear to work and then undo itself on the
     /// next launch.
     private static let wasResetDefault = "\(Bundle.main.bundleIdentifier ?? fallbackBundleIdentifier)" + ".keyWasReset"
 
-    /// Stored key if there is one, else the demo key — unless the user has
+    /// Stored key if there is one, else the configured key — unless the user has
     /// explicitly reset, in which case they get an empty field.
     static func initialValue() -> String {
         if let stored = load(), stored != legacyPlaceholder { return stored }
         if UserDefaults.standard.bool(forKey: wasResetDefault) { return "" }
-        return demoKey
+        return configuredKey
     }
 
     static func load() -> String? {

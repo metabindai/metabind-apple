@@ -3,7 +3,8 @@
 #
 # Generates Config/Local.xcconfig from Xcode Cloud environment variables so
 # the cloud build picks up private signing and project identity values without
-# those values ever being committed to the repo.
+# those values ever being committed to the repo. The API key is compiled into
+# the app's Info.plist; use only a restricted, revocable demo key.
 #
 # Required Xcode Cloud environment variables (set in App Store Connect):
 #   FINANCE_DEMO_BUNDLE_ID    — e.g. com.yourcompany.MetabindFinanceDemo

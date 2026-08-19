@@ -573,7 +573,7 @@ Four sample apps live in [`Samples/`](Samples). Each references this package loc
 | [Retail](Samples/MetabindContent/Retail) | A minimal `MetabindContent` integration: initialize the client, render content, and route between pages. |
 | [Spotlight](Samples/MetabindContent/Spotlight) | A richer `MetabindContent` integration: multiple content blocks, real-time updates, push notifications, and deep links. Includes a full account-setup guide. |
 | [AssistantDemo](Samples/MetabindAI/AssistantDemo) | A `MetabindAI` chat app whose tool returns render as live, native SwiftUI. About 20 lines of integration code. |
-| [FinanceDemo](Samples/MetabindAI/FinanceDemo) | A `MetabindAI` finance app with no chat in it — every screen is a rendered answer, routed to custom surfaces instead of a transcript. |
+| [FinanceDemo](Samples/MetabindAI/FinanceDemo) | A configurable `MetabindAI` reference app for a customer-owned Finance MCP project. It routes rendered answers to custom surfaces instead of a transcript and uses synthetic sample financial data. |
 
 > [!NOTE]
 > To use a sample outside this repository, change its package reference from the local path to the published package URL, `https://github.com/metabindai/metabind-apple`.
