@@ -46,7 +46,8 @@ public final class MetabindAssistant {
 
     /// Follow-up questions the model attached to the card it just rendered,
     /// in the order it suggested them. Empty until a tool call carrying them
-    /// streams in, and cleared at the start of each new message.
+    /// streams in. The most recently started card owns the list, so a later
+    /// card replaces earlier suggestions even when it supplies fewer.
     ///
     /// These ride along as an argument on a tool call the model is already
     /// making, so they cost no extra round trip — see ``nextStepsArgument``.
@@ -72,6 +73,9 @@ public final class MetabindAssistant {
     private var toolUIMap: [String: String] = [:]
     private var llmTools: [LLMTool] = []
     private var activeSessions: [String: ManualMCPAppSession] = [:]
+    private var nextStepsSessionID: String?
+    private var nextStepsSequence: Int?
+    private var nextToolSequence = 0
 
     /// When each live session was last handed a partial, for ``shouldFeed(_:)``.
     private var lastFedAt: [String: Date] = [:]
@@ -152,15 +156,50 @@ public final class MetabindAssistant {
         return true
     }
 
+    /// Delivers the accumulated arguments without throttling when a provider
+    /// reaches any terminal boundary. Some providers emit a canonical final
+    /// frame, while delta-only providers end with `contentBlockStop` or `.done`.
+    private func finalizeArgumentsIfNeeded(
+        _ accumulator: ToolAccumulator,
+        emptyArgumentsAreComplete: Bool = false
+    ) {
+        guard let session = activeSessions[accumulator.id],
+              !session.argumentsComplete else { return }
+        guard accumulator.hasArguments || emptyArgumentsAreComplete else { return }
+
+        let arguments = accumulator.hasArguments ? accumulator.arguments : .object([:])
+        lastFedAt[accumulator.id] = nil
+        absorbNextSteps(
+            from: arguments,
+            sessionID: accumulator.id,
+            sequence: accumulator.sequence
+        )
+        session.finalizeArguments(arguments)
+    }
+
     /// Reads ``nextStepsArgument`` out of a tool call's arguments, if present.
     ///
     /// Called on every partial parse, so it has to tolerate a half-streamed
     /// array: entries only grow and never shrink back, which keeps the pill
-    /// row from flickering as the model types the last suggestion. A tool call
-    /// that omits the argument leaves whatever the previous one supplied.
-    private func absorbNextSteps(from arguments: JSONValue) {
+    /// row from flickering as the model types the last suggestion. A newer
+    /// tool call takes ownership only when it actually supplies this argument;
+    /// late frames from an older call cannot reclaim the list.
+    private func absorbNextSteps(
+        from arguments: JSONValue,
+        sessionID: String,
+        sequence: Int
+    ) {
         guard let key = nextStepsArgument,
               let raw = arguments[key]?.arrayValue else { return }
+
+        if sessionID != nextStepsSessionID {
+            if let ownerSequence = nextStepsSequence, sequence < ownerSequence {
+                return
+            }
+            nextStepsSessionID = sessionID
+            nextStepsSequence = sequence
+            nextSteps = []
+        }
 
         let steps = raw.compactMap { $0.stringValue }
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -233,6 +272,9 @@ public final class MetabindAssistant {
         isProcessing = true
         activeSessions.removeAll()
         lastFedAt.removeAll()
+        nextStepsSessionID = nil
+        nextStepsSequence = nil
+        nextToolSequence = 0
         // The old card's follow-ups don't belong under the new one.
         nextSteps = []
 
@@ -273,6 +315,10 @@ public final class MetabindAssistant {
         llmHistory.removeAll()
         activeSessions.removeAll()
         lastFedAt.removeAll()
+        nextStepsSessionID = nil
+        nextStepsSequence = nil
+        nextToolSequence = 0
+        nextSteps = []
         pendingContext.removeAll()
         _hostBridge = nil
         // Fire-and-forget — reset is synchronous from the UI's perspective,
@@ -446,6 +492,7 @@ public final class MetabindAssistant {
     private struct ToolAccumulator {
         let id: String
         let name: String
+        let sequence: Int
         var jsonFragment: String = ""
         /// Authoritative parsed args, when the provider sent a
         /// `toolCallArgumentsFinal` frame. Wins over `jsonFragment` parse
@@ -514,7 +561,12 @@ public final class MetabindAssistant {
             case .toolCallStart(let index, let id, let name):
                 let uiResource = toolUIMap[name]
                 log.info("toolCallStart name=\(name, privacy: .public) id=\(id, privacy: .public) index=\(index, privacy: .public) uiResource=\(uiResource ?? "<none>", privacy: .public)")
-                toolAccumulators[index] = ToolAccumulator(id: id, name: name)
+                toolAccumulators[index] = ToolAccumulator(
+                    id: id,
+                    name: name,
+                    sequence: nextToolSequence
+                )
+                nextToolSequence += 1
 
                 // Reset bubble state so text emitted *after* this tool
                 // opens a fresh assistant bubble below the tool.
@@ -542,12 +594,16 @@ public final class MetabindAssistant {
                 // as the model streams. The accumulated buffer is strict-valid
                 // JSON only at the final fragment, so a strict parse would update
                 // the view just once (at completion); PartialJSON.parse recovers
-                // a valid JSONValue at most fragment boundaries. The authoritative
-                // value still arrives via `toolCallArgumentsFinal`.
+                // a valid JSONValue at most fragment boundaries. A terminal event
+                // delivers the complete accumulated value without throttling.
                 if let acc = toolAccumulators[index],
                    let partial = PartialJSON.parse(acc.jsonFragment) {
                     // Pills fill in as the model types them, same as the card.
-                    absorbNextSteps(from: partial)
+                    absorbNextSteps(
+                        from: partial,
+                        sessionID: acc.id,
+                        sequence: acc.sequence
+                    )
                     if let session = activeSessions[acc.id], shouldFeed(acc.id) {
                         session.feed(partial)
                     }
@@ -559,21 +615,16 @@ public final class MetabindAssistant {
                     break
                 }
                 toolAccumulators[index]?.canonicalArgs = args
-                absorbNextSteps(from: args)
                 if let acc = toolAccumulators[index] {
-                    lastFedAt[acc.id] = nil
-                }
-                if let acc = toolAccumulators[index],
-                   let session = activeSessions[acc.id] {
-                    // Surface the canonical args to the live BindJS view —
-                    // matters when partials were absent or didn't parse — and
-                    // mark the stream closed so a self-loading card knows its
-                    // props are finally trustworthy.
-                    session.finalizeArguments(args)
+                    finalizeArgumentsIfNeeded(acc)
                 }
 
             case .contentBlockStop(let index):
                 if let acc = toolAccumulators[index] {
+                    // A completed tool block with no deltas is a valid
+                    // zero-argument call. Distinguish it from a stream that
+                    // ends without a block stop, which remains incomplete.
+                    finalizeArgumentsIfNeeded(acc, emptyArgumentsAreComplete: true)
                     toolCalls.append(LLMToolCall(
                         id: acc.id,
                         name: acc.name,
@@ -600,6 +651,7 @@ public final class MetabindAssistant {
                         ))
                         continue
                     }
+                    finalizeArgumentsIfNeeded(acc)
                     toolCalls.append(LLMToolCall(
                         id: acc.id,
                         name: acc.name,

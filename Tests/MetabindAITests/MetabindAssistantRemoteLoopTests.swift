@@ -154,6 +154,98 @@ struct MetabindAssistantRemoteLoopTests {
         #expect(session.phase.isTerminal, "tool session should be terminal (completed/failed)")
     }
 
+    @Test func deltaOnlyLocalProviderFinalizesArgumentsDespiteThrottle() async throws {
+        let toolTurn: [LLMEvent] = [
+            .toolCallStart(index: 0, id: "toolu_delta", name: "spending_breakdown"),
+            .toolCallArgumentDelta(index: 0, fragment: #"{"period":"mtd","#),
+            .toolCallArgumentDelta(index: 0, fragment: #""category":"sushi","#),
+            .toolCallArgumentDelta(index: 0, fragment: #""limit":12}"#),
+            .contentBlockStop(index: 0),
+            .done(stopReason: .toolUse),
+        ]
+        let finalTurn: [LLMEvent] = [
+            .textDelta("Done"),
+            .done(stopReason: .endTurn),
+        ]
+        let provider = FakeProvider(runsToolsRemotely: false, turns: [toolTurn, finalTurn])
+        let assistant = MetabindAssistant(server: FakeMCPServer(), provider: provider)
+
+        assistant.send("show spending")
+        await waitUntil { !assistant.isProcessing }
+
+        let sessions = assistant.conversation.messages.compactMap { message -> MCPAppSession? in
+            if case .tool(let session) = message { return session }
+            return nil
+        }
+        let session = try #require(sessions.first)
+        #expect(session.partialArguments == .object([
+            "period": .string("mtd"),
+            "category": .string("sushi"),
+            "limit": .number(12),
+        ]))
+        #expect(session.argumentsComplete)
+    }
+
+    @Test func canonicalFinalArgumentsOverrideThrottledPartials() async throws {
+        let canonicalArguments: JSONValue = .object([
+            "period": .string("last_month"),
+            "category": .string("dining"),
+        ])
+        let events: [LLMEvent] = [
+            .toolCallStart(index: 0, id: "toolu_final", name: "spending_breakdown"),
+            .toolCallArgumentDelta(index: 0, fragment: #"{"period":"mtd"}"#),
+            .toolCallArgumentsFinal(index: 0, arguments: canonicalArguments),
+            .contentBlockStop(index: 0),
+            .toolResult(
+                toolCallId: "toolu_final",
+                content: "rendered",
+                structuredContent: nil,
+                isError: false
+            ),
+            .done(stopReason: .endTurn),
+        ]
+        let provider = FakeProvider(runsToolsRemotely: true, turns: [events])
+        let assistant = MetabindAssistant(server: FakeMCPServer(), provider: provider)
+
+        assistant.send("show spending")
+        await waitUntil { !assistant.isProcessing }
+
+        let sessions = assistant.conversation.messages.compactMap { message -> MCPAppSession? in
+            if case .tool(let session) = message { return session }
+            return nil
+        }
+        let session = try #require(sessions.first)
+        #expect(session.partialArguments == canonicalArguments)
+        #expect(session.argumentsComplete)
+    }
+
+    @Test func zeroArgumentToolFinalizesAtContentBlockStop() async throws {
+        let toolTurn: [LLMEvent] = [
+            .toolCallStart(index: 0, id: "toolu_empty", name: "refresh_dashboard"),
+            .contentBlockStop(index: 0),
+            .done(stopReason: .toolUse),
+        ]
+        let finalTurn: [LLMEvent] = [
+            .textDelta("Refreshed"),
+            .done(stopReason: .endTurn),
+        ]
+        let provider = FakeProvider(runsToolsRemotely: false, turns: [toolTurn, finalTurn])
+        let server = FakeMCPServer()
+        let assistant = MetabindAssistant(server: server, provider: provider)
+
+        assistant.send("refresh")
+        await waitUntil { !assistant.isProcessing }
+
+        let sessions = assistant.conversation.messages.compactMap { message -> MCPAppSession? in
+            if case .tool(let session) = message { return session }
+            return nil
+        }
+        let session = try #require(sessions.first)
+        #expect(session.partialArguments == .object([:]))
+        #expect(session.argumentsComplete)
+        #expect((await server.toolCallInvocations) == 1)
+    }
+
     @Test func remoteToolResultWithErrorCompletesSessionAsFailed() async {
         let events: [LLMEvent] = [
             .toolCallStart(index: 0, id: "toolu_x", name: "brokenThing"),

@@ -108,6 +108,53 @@ struct MetabindAssistantNextStepsTests {
         #expect(assistant.nextSteps == ["Why is shopping up?", "Show me last month"])
     }
 
+    @Test func latestCardWinsEvenWhenOlderCardFinishesLate() async {
+        let firstSteps: JSONValue = .object([
+            "nextSteps": .array([
+                .string("First A"),
+                .string("First B"),
+                .string("First C"),
+            ]),
+        ])
+        let secondSteps = #"{"nextSteps":["Second A","Second B"]}"#
+        let events: [LLMEvent] = [
+            .toolCallStart(index: 0, id: "toolu_1", name: "spending_breakdown"),
+            .toolCallArgumentDelta(index: 0, fragment: #"{"nextSteps":["First A","First B","First C"]}"#),
+            .toolCallStart(index: 1, id: "toolu_2", name: "net_worth"),
+            .toolCallArgumentDelta(index: 1, fragment: secondSteps),
+            // The older card's canonical frame arrives after the newer card
+            // starts. It must not reclaim the shared suggestion list.
+            .toolCallArgumentsFinal(index: 0, arguments: firstSteps),
+            .contentBlockStop(index: 0),
+            .contentBlockStop(index: 1),
+            .toolResult(toolCallId: "toolu_1", content: "first", structuredContent: nil, isError: false),
+            .toolResult(toolCallId: "toolu_2", content: "second", structuredContent: nil, isError: false),
+            .done(stopReason: .endTurn),
+        ]
+
+        let assistant = await run(events)
+
+        #expect(assistant.nextSteps == ["Second A", "Second B"])
+    }
+
+    @Test func laterToolWithoutSuggestionsDoesNotClearTheLatestCard() async {
+        let events: [LLMEvent] = [
+            .toolCallStart(index: 0, id: "toolu_1", name: "spending_breakdown"),
+            .toolCallArgumentDelta(index: 0, fragment: #"{"nextSteps":["Keep this"]}"#),
+            .contentBlockStop(index: 0),
+            .toolCallStart(index: 1, id: "toolu_2", name: "save_preference"),
+            .toolCallArgumentDelta(index: 1, fragment: #"{"enabled":true}"#),
+            .contentBlockStop(index: 1),
+            .toolResult(toolCallId: "toolu_1", content: "first", structuredContent: nil, isError: false),
+            .toolResult(toolCallId: "toolu_2", content: "second", structuredContent: nil, isError: false),
+            .done(stopReason: .endTurn),
+        ]
+
+        let assistant = await run(events)
+
+        #expect(assistant.nextSteps == ["Keep this"])
+    }
+
     @Test func newMessageClearsThePreviousCardsSuggestions() async {
         let first = cardTurn(argumentJSON: #"{"nextSteps":["Stale suggestion"]}"#)
         let second: [LLMEvent] = [.textDelta("no card here"), .done(stopReason: .endTurn)]
