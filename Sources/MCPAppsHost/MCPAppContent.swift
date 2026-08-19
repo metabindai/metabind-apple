@@ -86,11 +86,12 @@ public struct MCPAppContent: View {
         )
     }
 
-    private func buildEnvironment() -> [String: any Codable] {
+    func buildEnvironment() -> [String: any Codable] {
         var env: [String: any Codable] = [:]
         env["toolName"] = session.toolName
         env["displayMode"] = session.displayMode.rawValue
         env["toolArguments"] = jsonString(session.toolArguments)
+        env["argumentsComplete"] = session.argumentsComplete
 
         if let partial = session.partialArguments {
             env["partialArguments"] = jsonString(partial)
