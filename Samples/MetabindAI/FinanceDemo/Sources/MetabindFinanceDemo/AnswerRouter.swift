@@ -141,6 +141,7 @@ final class AnswerRouter {
         presentationTask?.cancel()
         presentationTask = nil
         assistant.cancel()
+        assistant.clearPendingContext()
         // Mark it handled on the way out, or the next `sync()` would see an
         // unaccounted-for user message and adopt the turn straight back.
         if let pending { handledUpTo = pending.startIndex }
