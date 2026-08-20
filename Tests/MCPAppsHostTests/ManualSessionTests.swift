@@ -1,6 +1,20 @@
 import Testing
 import Foundation
+import Observation
 @testable import MCPAppsHost
+
+private final class ObservationFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage = false
+
+    var value: Bool {
+        lock.withLock { storage }
+    }
+
+    func set() {
+        lock.withLock { storage = true }
+    }
+}
 
 @Suite("ManualMCPAppSession")
 @MainActor
@@ -91,6 +105,27 @@ struct ManualSessionTests {
 
         #expect(session.phase.isCompleted)
         #expect(session.partialArguments?["step"] == .number(2))
+    }
+
+    @Test func argumentsCompleteIsObservableInComponentEnvironment() {
+        let session = ManualMCPAppSession(toolCall: makeToolCall(), server: TestServer())
+        let content = MCPAppContent(resolved: nil, session: session, toolResult: nil)
+        let environmentChanged = ObservationFlag()
+
+        let initialEnvironment = withObservationTracking {
+            content.buildEnvironment()
+        } onChange: {
+            environmentChanged.set()
+        }
+
+        #expect(initialEnvironment["argumentsComplete"] as? Bool == false)
+
+        // Change only this property so another observed mutation cannot make
+        // the invalidation assertion pass accidentally.
+        session.argumentsComplete = true
+
+        #expect(environmentChanged.value)
+        #expect(content.buildEnvironment()["argumentsComplete"] as? Bool == true)
     }
 
     @Test func callbackFiresOnComplete() async throws {

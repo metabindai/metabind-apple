@@ -181,6 +181,17 @@ extension BindJSBundle {
 /// Default resolver chain: BindJS first, HTML fallback.
 public let defaultResolvers: [any ContentResolver] = [BindJSResolver(), HTMLResolver()]
 
+/// Process-wide caches MCPAppsHost keeps outside any one client.
+public enum MCPAppsCaches {
+    /// Drops the decoded BindJS component package shared by every `ui://` resource.
+    ///
+    /// Independent of a client's resource cache: that one holds the fetched
+    /// bytes, this one holds the parse of them. A debug reset wants both.
+    public static func invalidateBindJSPackage() {
+        BindJSPackageCache.shared.invalidate()
+    }
+}
+
 // MARK: - Package Cache
 
 /// Caches the full component dictionary from the server's BindJS package.

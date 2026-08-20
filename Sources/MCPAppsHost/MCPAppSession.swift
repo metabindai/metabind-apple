@@ -41,6 +41,16 @@ public class MCPAppSession: Identifiable {
     /// render the tool UI progressively.
     public internal(set) var partialArguments: JSONValue?
 
+    /// Whether ``partialArguments`` has stopped changing — the model has
+    /// finished typing this tool call.
+    ///
+    /// A card that loads its own data needs this. Mid-stream its props are a
+    /// prefix of the truth: a `period` that hasn't arrived yet reads as absent,
+    /// so fetching against it queries the wrong window and then caches that
+    /// answer. Surfaced to components as the `argumentsComplete` environment
+    /// flag so they can hold a loading state until their inputs are real.
+    public internal(set) var argumentsComplete: Bool = false
+
     /// Sendable model-layer phase. No view content.
     public enum Phase: Sendable {
         case loading
@@ -355,9 +365,16 @@ public class MCPAppSession: Identifiable {
         }
 
         log.info("[\(self.toolName, privacy: .public)] Fetching resource: \(uri, privacy: .public)")
+        // How long the card sat waiting for its own definition before it could
+        // draw anything. This is the whole point of prefetching: warm, it is a
+        // dictionary lookup; cold, it is a few hundred KB over the wire while
+        // the user looks at a spinner. Logged in ms so the two can be compared
+        // rather than argued about.
+        let fetchStarted = Date()
         let resource = try await server.readResource(uri: uri)
         try Task.checkCancellation()
-        log.info("[\(self.toolName, privacy: .public)] Resource fetched: mimeType=\(resource.mimeType, privacy: .public)")
+        let waitedMs = Int(Date().timeIntervalSince(fetchStarted) * 1000)
+        log.info("[\(self.toolName, privacy: .public)] Resource fetched: mimeType=\(resource.mimeType, privacy: .public) waited=\(waitedMs, privacy: .public)ms")
 
         guard let resolver = resolvers.first(where: { $0.canResolve(mimeType: resource.mimeType) }) else {
             log.error("[\(self.toolName, privacy: .public)] No resolver for mimeType=\(resource.mimeType, privacy: .public)")

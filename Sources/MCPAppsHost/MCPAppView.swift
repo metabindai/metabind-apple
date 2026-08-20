@@ -136,10 +136,14 @@ public struct DefaultMCPAppContent: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
 
-        case .active(let content):
-            content
-
-        case .completed(let content, _):
+        // Active and completed share one arm on purpose. Two arms are two
+        // branches of a `_ConditionalContent`, which SwiftUI treats as two
+        // different views: crossing .active → .completed would tear the first
+        // down and build the second fresh, discarding the JS context behind it
+        // and every `useState` a component was holding. A card that loads its
+        // own data would then drop back to its spinner and refetch, mid-turn,
+        // for no reason the user can see.
+        case .active(let content), .completed(let content, _):
             content
 
         case .failed(let error):
@@ -163,9 +167,9 @@ public struct _MCPAppConditionalContent<C: View, P: View>: View {
         switch phase {
         case .loading:
             placeholderBuilder()
-        case .active(let content):
-            contentBuilder(content)
-        case .completed(let content, _):
+        // One arm, so the view survives the .active → .completed transition
+        // with its identity — and its state — intact. See DefaultMCPAppContent.
+        case .active(let content), .completed(let content, _):
             contentBuilder(content)
         case .failed(let error):
             MCPAppErrorView(error: error) { session.retry() }
