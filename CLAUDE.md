@@ -49,13 +49,14 @@ apollo-ios-cli generate
 
 ## Samples
 
-Three Xcode projects under `Samples/`, grouped by the product they demonstrate:
+Four Xcode projects under `Samples/`, grouped by the product they demonstrate:
 
 | Sample | Shows |
 |---|---|
 | `Samples/MetabindContent/Retail` | Minimal `MetabindContent` integration: client setup, content rendering, page navigation |
 | `Samples/MetabindContent/Spotlight` | Richer `MetabindContent` integration: multiple content blocks, real-time updates, push notifications, deep links |
 | `Samples/MetabindAI/AssistantDemo` | `MetabindAI` chat app (macOS) whose tool returns render as live SwiftUI, via the agent proxy |
+| `Samples/MetabindAI/FinanceDemo` | `MetabindAI` finance app (iOS) with custom answer surfaces instead of a chat transcript, driven by `AnswerRouter` |
 
 Each project references this package by local path (`XCLocalSwiftPackageReference` pointing at `../../..`), so building a sample compiles the SDK from your current checkout — the fastest way to see a source change running in a real app. Open the sample's `.xcodeproj`; each sample has its own README with account and credential setup.
 

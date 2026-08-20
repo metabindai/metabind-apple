@@ -1,0 +1,20 @@
+// Shared base config — committed and public. Do not put a real team ID,
+// distribution bundle identifier, org ID, project ID, API key, or anything
+// else identifying to a private account in this file.
+//
+// For a local device or TestFlight build, copy Local.xcconfig.example to
+// Local.xcconfig (same directory) and fill in your own values. Local.xcconfig
+// is gitignored, so it's picked up here via an optional include and never
+// committed or published. Without it, the project builds exactly as it does
+// for anyone who clones the sample: unsigned-for-device, generic bundle id,
+// placeholder org/project identifiers, and no preconfigured API key.
+//
+// For Xcode Cloud, the ci_post_clone.sh script writes a Local.xcconfig from
+// environment variables — see that script for the required variable names.
+FINANCE_DEMO_BUNDLE_ID = com.example.MetabindFinanceDemo
+FINANCE_DEMO_ORG_ID = YOUR_ORG_ID
+FINANCE_DEMO_PROJECT_ID = YOUR_PROJECT_ID
+FINANCE_DEMO_API_KEY =
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"
