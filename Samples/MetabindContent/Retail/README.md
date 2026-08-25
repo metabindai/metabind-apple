@@ -75,4 +75,4 @@ Listen for `metabind.content` actions to navigate between content pages:
 
 ## License
 
-Copyright © 2026 Yap Studios LLC. All rights reserved. See [`LICENSE`](LICENSE).
+Apache License 2.0, with the rest of this repository. See [`LICENSE`](../../../LICENSE) and [`NOTICE`](../../../NOTICE).

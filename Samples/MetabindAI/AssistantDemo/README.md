@@ -72,4 +72,4 @@ That's the whole integration. `MetabindAssistant` handles tool discovery, the (s
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+Apache License 2.0, with the rest of this repository. See [`LICENSE`](../../../LICENSE) and [`NOTICE`](../../../NOTICE).
