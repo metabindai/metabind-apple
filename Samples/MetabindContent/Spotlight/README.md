@@ -171,3 +171,7 @@ The sample project is free. Metabind has a free tier for development and testing
 - [iOS SDK Guide](https://docs.metabind.ai/guides/sdks/ios-sdk)
 - [Metabind](https://metabind.ai)
 - [metabind-apple SDK](https://github.com/metabindai/metabind-apple)
+
+## License
+
+Apache License 2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).

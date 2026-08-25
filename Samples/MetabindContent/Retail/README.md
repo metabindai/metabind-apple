@@ -75,4 +75,4 @@ Listen for `metabind.content` actions to navigate between content pages:
 
 ## License
 
-Apache License 2.0, with the rest of this repository. See [`LICENSE`](../../../LICENSE) and [`NOTICE`](../../../NOTICE).
+Apache License 2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
