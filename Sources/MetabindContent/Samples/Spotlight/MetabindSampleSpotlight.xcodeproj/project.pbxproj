@@ -11,13 +11,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		07A7E1A62EE8A1EE002B8C7B /* MetabindSampleRetail.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MetabindSampleRetail.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		07A7E1A62EE8A1EE002B8C7B /* MetabindSampleSpotlight.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MetabindSampleSpotlight.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		07A7E1A82EE8A1EE002B8C7B /* MetabindSampleRetail */ = {
+		07A7E1A82EE8A1EE002B8C7B /* MetabindSampleSpotlight */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = MetabindSampleRetail;
+			path = MetabindSampleSpotlight;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -37,7 +37,7 @@
 		07A7E19D2EE8A1EE002B8C7B = {
 			isa = PBXGroup;
 			children = (
-				07A7E1A82EE8A1EE002B8C7B /* MetabindSampleRetail */,
+				07A7E1A82EE8A1EE002B8C7B /* MetabindSampleSpotlight */,
 				07A7E1A72EE8A1EE002B8C7B /* Products */,
 			);
 			sourceTree = "<group>";
@@ -45,7 +45,7 @@
 		07A7E1A72EE8A1EE002B8C7B /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				07A7E1A62EE8A1EE002B8C7B /* MetabindSampleRetail.app */,
+				07A7E1A62EE8A1EE002B8C7B /* MetabindSampleSpotlight.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -53,9 +53,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		07A7E1A52EE8A1EE002B8C7B /* MetabindSampleRetail */ = {
+		07A7E1A52EE8A1EE002B8C7B /* MetabindSampleSpotlight */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 07A7E1B12EE8A1EF002B8C7B /* Build configuration list for PBXNativeTarget "MetabindSampleRetail" */;
+			buildConfigurationList = 07A7E1B12EE8A1EF002B8C7B /* Build configuration list for PBXNativeTarget "MetabindSampleSpotlight" */;
 			buildPhases = (
 				07A7E1A22EE8A1EE002B8C7B /* Sources */,
 				07A7E1A32EE8A1EE002B8C7B /* Frameworks */,
@@ -66,14 +66,14 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				07A7E1A82EE8A1EE002B8C7B /* MetabindSampleRetail */,
+				07A7E1A82EE8A1EE002B8C7B /* MetabindSampleSpotlight */,
 			);
-			name = MetabindSampleRetail;
+			name = MetabindSampleSpotlight;
 			packageProductDependencies = (
 				07A7E1B52EE8A833002B8C7B /* Metabind */,
 			);
-			productName = MetabindSampleRetail;
-			productReference = 07A7E1A62EE8A1EE002B8C7B /* MetabindSampleRetail.app */;
+			productName = MetabindSampleSpotlight;
+			productReference = 07A7E1A62EE8A1EE002B8C7B /* MetabindSampleSpotlight.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -91,7 +91,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 07A7E1A12EE8A1EE002B8C7B /* Build configuration list for PBXProject "MetabindSampleRetail" */;
+			buildConfigurationList = 07A7E1A12EE8A1EE002B8C7B /* Build configuration list for PBXProject "MetabindSampleSpotlight" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -108,7 +108,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				07A7E1A52EE8A1EE002B8C7B /* MetabindSampleRetail */,
+				07A7E1A52EE8A1EE002B8C7B /* MetabindSampleSpotlight */,
 			);
 		};
 /* End PBXProject section */
@@ -262,7 +262,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 8JU59R7PAE;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -270,12 +270,13 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.MetabindSampleRetail;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.MetabindSampleSpotlight;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -294,7 +295,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 8JU59R7PAE;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -302,12 +303,13 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.MetabindSampleRetail;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.MetabindSampleSpotlight;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -322,7 +324,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		07A7E1A12EE8A1EE002B8C7B /* Build configuration list for PBXProject "MetabindSampleRetail" */ = {
+		07A7E1A12EE8A1EE002B8C7B /* Build configuration list for PBXProject "MetabindSampleSpotlight" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				07A7E1AF2EE8A1EF002B8C7B /* Debug */,
@@ -331,7 +333,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		07A7E1B12EE8A1EF002B8C7B /* Build configuration list for PBXNativeTarget "MetabindSampleRetail" */ = {
+		07A7E1B12EE8A1EF002B8C7B /* Build configuration list for PBXNativeTarget "MetabindSampleSpotlight" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				07A7E1B22EE8A1EF002B8C7B /* Debug */,
@@ -343,9 +345,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		07A7E1B42EE8A833002B8C7B /* XCLocalSwiftPackageReference "../../.." */ = {
+		07A7E1B42EE8A833002B8C7B /* XCLocalSwiftPackageReference "../../../.." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../..";
+			relativePath = "../../../..";
 		};
 /* End XCLocalSwiftPackageReference section */
 

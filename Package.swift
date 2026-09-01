@@ -32,7 +32,7 @@ let package = Package(
                 .product(name: "ApolloWebSocket", package: "apollo-ios"),
                 .product(name: "BindJS", package: "bindjs-apple"),
             ],
-            exclude: ["GraphQL"]
+            exclude: ["GraphQL", "Samples"]
         ),
         .target(
             name: "MCPAppsHost",

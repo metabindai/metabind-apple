@@ -26,7 +26,7 @@ swift test                               # Run MCPAppsHostTests and MetabindAITe
 swift test --filter MCPAppsHostTests     # Run one suite
 ```
 
-`MetabindContent` has no test target. Validate changes there with `swift build` and by running the `Samples/MetabindContent` apps.
+`MetabindContent` has no test target. Validate changes there with `swift build` and by running the sample apps in `Sources/MetabindContent/Samples/`.
 
 ## GraphQL codegen (MetabindContent)
 
@@ -49,15 +49,15 @@ apollo-ios-cli generate
 
 ## Samples
 
-Three Xcode projects under `Samples/`, grouped by the product they demonstrate:
+Three sample Xcode projects, grouped by the product they demonstrate. The `MetabindContent` samples sit inside the target's source folder and are kept out of the build by the target's `exclude` list in `Package.swift` — extend that list if you add folders there:
 
 | Sample | Shows |
 |---|---|
-| `Samples/MetabindContent/Retail` | Minimal `MetabindContent` integration: client setup, content rendering, page navigation |
-| `Samples/MetabindContent/Spotlight` | Richer `MetabindContent` integration: multiple content blocks, real-time updates, push notifications, deep links |
+| `Sources/MetabindContent/Samples/Retail` | Minimal `MetabindContent` integration: client setup, content rendering, page navigation |
+| `Sources/MetabindContent/Samples/Spotlight` | Richer `MetabindContent` integration: multiple content blocks, real-time updates, push notifications, deep links |
 | `Samples/MetabindAI/AssistantDemo` | `MetabindAI` chat app (macOS) whose tool returns render as live SwiftUI, via the agent proxy |
 
-Samples exist to exercise and debug the SDK; product demos built on tagged releases live in `metabindai/metabind-demos`, not here. Each project references this package by local path (`XCLocalSwiftPackageReference` pointing at `../../..`), so building a sample compiles the SDK from your current checkout — the fastest way to see a source change running in a real app. Open the sample's `.xcodeproj`; each sample has its own README with account and credential setup.
+Samples exist to exercise and debug the SDK; product demos built on tagged releases live in `metabindai/metabind-demos`, not here. Each project references this package by local path (`XCLocalSwiftPackageReference` pointing at the repo root), so building a sample compiles the SDK from your current checkout — the fastest way to see a source change running in a real app. Open the sample's `.xcodeproj`; each sample has its own README with account and credential setup.
 
 ## Conventions
 

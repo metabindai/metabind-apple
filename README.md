@@ -566,12 +566,12 @@ do {
 
 ## Samples
 
-Three sample apps live in [`Samples/`](Samples). Each references this package locally, so you can open one, build it, and see the SDK working against the current source.
+Three sample apps ship in this repository. Each references this package locally, so you can open one, build it, and see the SDK working against the current source. The `MetabindContent` samples live beside the code they exercise, under [`Sources/MetabindContent/Samples/`](Sources/MetabindContent/Samples) (excluded from the package build); the `MetabindAI` sample lives under [`Samples/`](Samples).
 
 | Sample | Shows |
 |---|---|
-| [Retail](Samples/MetabindContent/Retail) | A minimal `MetabindContent` integration: initialize the client, render content, and route between pages. |
-| [Spotlight](Samples/MetabindContent/Spotlight) | A richer `MetabindContent` integration: multiple content blocks, real-time updates, push notifications, and deep links. Includes a full account-setup guide. |
+| [Retail](Sources/MetabindContent/Samples/Retail) | A minimal `MetabindContent` integration: initialize the client, render content, and route between pages. |
+| [Spotlight](Sources/MetabindContent/Samples/Spotlight) | A richer `MetabindContent` integration: multiple content blocks, real-time updates, push notifications, and deep links. Includes a full account-setup guide. |
 | [AssistantDemo](Samples/MetabindAI/AssistantDemo) | A `MetabindAI` chat app whose tool returns render as live, native SwiftUI. About 20 lines of integration code. |
 
 > [!NOTE]
