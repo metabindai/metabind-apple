@@ -124,12 +124,9 @@ struct ResolverTests {
 
     // MARK: - Package Cache
 
-    @Test func packageCacheHitsOnSecondResolve() async throws {
+    @Test func packageCacheKeepsLayoutsSeparate() async throws {
         // Clear any prior cache state
-        BindJSPackageCache.shared.store(
-            layoutName: "_reset_",
-            content: ResolvedContent(compiled: "", package: PackageComponents(version: "_none_", components: [:]))
-        )
+        BindJSPackageCache.shared.invalidate()
 
         let resolver = BindJSResolver()
 
@@ -162,7 +159,7 @@ struct ResolverTests {
         #expect(contentA.package.components["LayoutB"] == "const b = 2")
         #expect(contentA.package.components["LayoutA"] == nil) // removed as layout
 
-        // Second resolve with different layout: should hit cache
+        // A different layout resolves its own entry, with the correct body.
         let resultB = try await resolver.resolve(makeResource(layout: "LayoutB"))
         guard case .bindJS(let contentB) = resultB else {
             Issue.record("Expected .bindJS"); return
@@ -173,6 +170,23 @@ struct ResolverTests {
     }
 
     // MARK: - Default resolvers
+
+    @Test func draftEditsAndProjectsWithSameVersionUseTheirOwnSources() async throws {
+        let resolver = BindJSResolver()
+        func resource(_ code: String) -> ResourceContent {
+            ResourceContent(uri: "ui://project/card", mimeType: "application/vnd.bindjs+json", text: """
+            {"layoutComponentName":"Card","packageVersion":"draft","package":{"version":"draft","compiled":{"components":{"Card":"\(code)"}}}}
+            """)
+        }
+        let first = try await resolver.resolve(resource("original"))
+        let edited = try await resolver.resolve(resource("edited"))
+        let otherProject = try await resolver.resolve(resource("other project"))
+        #expect(first != edited)
+        #expect(edited != otherProject)
+        #expect(try await resolver.resolve(resource("original")) == first)
+        guard case .bindJS(let content) = edited else { Issue.record("Expected BindJS"); return }
+        #expect(content.compiled == "edited")
+    }
 
     @Test func defaultResolversPreferBindJS() {
         let resolvers = defaultResolvers

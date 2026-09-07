@@ -28,6 +28,8 @@ public actor MetabindAgentProvider: LLMProvider {
     public nonisolated let apiKey: String
     public nonisolated let orgId: String
     public nonisolated let projectId: String
+    /// Use the project's saved draft configuration when previewing in a host app.
+    public nonisolated let draft: Bool
     private nonisolated let urlSession: URLSession
 
     private static let log = Logger(subsystem: "MetabindAssistant", category: "AgentProxy")
@@ -51,6 +53,7 @@ public actor MetabindAgentProvider: LLMProvider {
         apiKey: String,
         orgId: String,
         projectId: String,
+        draft: Bool = false,
         conversationId: String? = nil,
         urlSession: URLSession = .shared
     ) {
@@ -58,6 +61,7 @@ public actor MetabindAgentProvider: LLMProvider {
         self.apiKey = apiKey
         self.orgId = orgId
         self.projectId = projectId
+        self.draft = draft
         self.conversationId = conversationId
         self.urlSession = urlSession
     }
@@ -126,6 +130,7 @@ public actor MetabindAgentProvider: LLMProvider {
             "messages": try scopedMessages(messages),
             "stream": true,
         ]
+        if draft { body["draft"] = true }
         if let conversationId {
             body["conversationId"] = conversationId
         }
