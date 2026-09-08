@@ -21,6 +21,15 @@ Total integration code: **~20 lines of Swift**.
 
 ## Run
 
+For a local build with prefilled credentials, copy
+`Config/Local.xcconfig.example` to the ignored `Config/Local.xcconfig` and set
+the organization ID, project ID, and API key. Leave the key empty to use a
+saved Keychain key, or enter one at launch if none is saved. A nonempty
+configured key replaces the saved Keychain key when the app starts.
+Use a restricted demo key with `execute:mcp` and `read:types` for the Oak & Ivory
+project; tool discovery needs the latter permission. Configured keys are
+embedded in the built app's Info.plist. Never commit `Local.xcconfig`.
+
 ```sh
 open MetabindAssistantDemo.xcodeproj
 ```
@@ -72,4 +81,4 @@ That's the whole integration. `MetabindAssistant` handles tool discovery, the (s
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+Apache License 2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).

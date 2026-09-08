@@ -17,6 +17,9 @@
 		9D867DCE8A4D2F008DDCE67C /* MetabindAssistantDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MetabindAssistantDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0C00CC36A1D25401D6A93F2 /* MetabindAssistantDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetabindAssistantDemoApp.swift; sourceTree = "<group>"; };
 		FDFBAFA672E45308608F2B8B /* metabind-apple */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "metabind-apple"; path = "../../.."; sourceTree = SOURCE_ROOT; };
+		A27000000000000000000001 /* AssistantDemo.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = AssistantDemo.xcconfig; sourceTree = "<group>"; };
+		A27000000000000000000002 /* Local.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = Local.xcconfig.example; sourceTree = "<group>"; };
+		A27000000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +62,7 @@
 		D1536885FE7953691B602A42 = {
 			isa = PBXGroup;
 			children = (
+				A27000000000000000000004 /* Config */,
 				353AFAAF012E7409E16FAEC0 /* Packages */,
 				89623F5D56BDA9ECBD9C02C5 /* Sources */,
 				E4DB74D4AF61D8DA585F7450 /* Products */,
@@ -71,6 +75,16 @@
 				9D867DCE8A4D2F008DDCE67C /* MetabindAssistantDemo.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A27000000000000000000004 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				A27000000000000000000001 /* AssistantDemo.xcconfig */,
+				A27000000000000000000002 /* Local.xcconfig.example */,
+				A27000000000000000000003 /* Info.plist */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -143,6 +157,7 @@
 /* Begin XCBuildConfiguration section */
 		5345486CCB615F8A59B4B66C /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A27000000000000000000001 /* AssistantDemo.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MetabindAssistantDemo.entitlements;
@@ -150,6 +165,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Metabind Assistant Demo";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -293,6 +309,7 @@
 		};
 		B18394EFE35198F02C9A817D /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A27000000000000000000001 /* AssistantDemo.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MetabindAssistantDemo.entitlements;
@@ -300,6 +317,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Metabind Assistant Demo";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
