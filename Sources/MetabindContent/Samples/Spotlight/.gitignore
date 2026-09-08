@@ -72,3 +72,6 @@ playground.xcworkspace
 
 # Crashlytics
 Crashlytics.framework/
+
+# Private local configuration
+Config/Local.xcconfig

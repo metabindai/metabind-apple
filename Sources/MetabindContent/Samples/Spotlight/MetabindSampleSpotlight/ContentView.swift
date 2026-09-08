@@ -70,13 +70,13 @@ struct HomeView: View {
                     // the view updates in real time when content is published in the
                     // Metabind — no pull-to-refresh or app restart needed. Try editing
                     // this content in Metabind and watch it change on-device.
-                    MetabindView(contentId: "cont_1772074912950486", enableSubscription: true)
+                    MetabindView(contentId: SampleConfiguration.heroContentId, enableSubscription: true)
                 }
 
                 // A second piece of content — an info-cards rail — also fully
                 // CMS-driven. Multiple MetabindViews can appear on the same
                 // screen, each fetching independently.
-                MetabindView(contentId: "cont_1772070964812541")
+                MetabindView(contentId: SampleConfiguration.infoContentId)
 
                 // Native views below — MetabindView is just another SwiftUI
                 // view, so it composes naturally with the rest of your UI.
@@ -241,4 +241,3 @@ struct NotificationContentSheet: View {
         }
     }
 }
-

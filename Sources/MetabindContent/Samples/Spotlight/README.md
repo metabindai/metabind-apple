@@ -12,15 +12,21 @@ A SwiftUI sample app showing how to render CMS-managed content natively using th
 
 ## Requirements
 
-- Xcode 16 or later
-- iOS 17.0 or later
+- Xcode 26.2 or later
+- iOS 26.2 or later (the sample target; the SDK supports earlier OS versions)
 
 ## Quick Start
 
 Follow the [setup guide](#getting-your-own-metabind-credentials) below to create a free Metabind account and add your credentials to the app, then:
 
-1. Open `MetabindSampleSpotlight.xcodeproj` in Xcode.
-2. Build and run on a simulator or device.
+1. Copy `Config/Local.xcconfig.example` to the ignored `Config/Local.xcconfig`.
+2. Fill in the API key, organization/project IDs, and all three content IDs.
+3. Open `MetabindSampleSpotlight.xcodeproj` in Xcode and run on an iPhone simulator.
+
+The original hosted content is no longer available. Reproducible replacement
+components and content values are in [SeedContent](SeedContent/README.md).
+Create and publish them in your own project, then put the returned IDs in
+`Local.xcconfig`.
 
 ## Getting Your Own Metabind Credentials
 
@@ -61,19 +67,20 @@ The SDK section also shows a ready-to-use SwiftUI code snippet with your IDs pre
 
 ### 5. Add Your Credentials to the App
 
-Open `MetabindSampleSpotlightApp.swift` and replace the values in the `MetabindClient` initializer:
+Set the following values in the ignored `Config/Local.xcconfig`:
 
-```swift
-@State var client = MetabindClient(
-    url: URL(string: "https://api.metabind.ai/graphql")!,
-    ws: URL(string: "wss://ws-api.metabind.ai")!,
-    apiKey: "YOUR_API_KEY",
-    organizationId: "YOUR_ORGANIZATION_ID",
-    projectId: "YOUR_PROJECT_ID"
-)
-```
+- `SPOTLIGHT_SAMPLE_API_KEY`
+- `SPOTLIGHT_SAMPLE_ORG_ID`
+- `SPOTLIGHT_SAMPLE_PROJECT_ID`
+- `SPOTLIGHT_SAMPLE_HERO_CONTENT_ID`
+- `SPOTLIGHT_SAMPLE_INFO_CONTENT_ID`
+- `SPOTLIGHT_SAMPLE_PROMOTION_CONTENT_ID`
 
-The `url` and `ws` endpoints stay the same for all projects.
+`SampleConfiguration` reads these through the built app's Info.plist. Use a
+restricted demo key with `read:content`, `read:types`, `read:packages`,
+`read:components`, and `read:assets`. The key is embedded in the built app;
+never commit `Local.xcconfig` or distribute a build with a private test key.
+The API and WebSocket endpoints are already configured in the app.
 
 Then inject the client into the SwiftUI environment so `MetabindView` can access it:
 

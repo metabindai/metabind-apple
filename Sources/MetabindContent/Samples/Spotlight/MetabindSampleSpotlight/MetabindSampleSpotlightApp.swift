@@ -28,9 +28,9 @@ struct MetabindSampleSpotlightApp: App {
     @State var client = MetabindClient(
         url: URL(string: "https://api.metabind.ai/graphql")!,
         ws: URL(string: "wss://ws-api.metabind.ai")!,
-        apiKey: <#API Key#>,
-        organizationId: <#Organization ID#>,
-        projectId: <#Project ID#>
+        apiKey: SampleConfiguration.apiKey,
+        organizationId: SampleConfiguration.organizationId,
+        projectId: SampleConfiguration.projectId
     )
 
     @State private var notificationManager = NotificationManager()
@@ -60,7 +60,7 @@ struct MetabindSampleSpotlightApp: App {
                 }
             }
             .sheet(isPresented: $showPromotionSheet) {
-                NotificationContentSheet(contentId: "cont_1772073374838679") { ctaName in
+                NotificationContentSheet(contentId: SampleConfiguration.promotionContentId) { ctaName in
                     selectedCTA = ctaName
                     showPromotionSheet = false
                 }
