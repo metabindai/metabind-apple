@@ -13,8 +13,10 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     private static let categoryId = "PROMOTION"
     private static let viewActionId = "VIEW_PROMOTION"
 
-    override init() {
-        super.init()
+    /// Install the retained manager after SwiftUI has established its state.
+    /// Setting the weak delegate in init can point it at a temporary instance
+    /// created while SwiftUI reevaluates the App value.
+    func configure() {
         UNUserNotificationCenter.current().delegate = self
         registerCategories()
     }

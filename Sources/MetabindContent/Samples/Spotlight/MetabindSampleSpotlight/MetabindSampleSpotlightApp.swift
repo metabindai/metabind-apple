@@ -55,6 +55,7 @@ struct MetabindSampleSpotlightApp: App {
             // remember to inject the client there too (see the `.sheet` below).
             .environment(client)
             .task {
+                notificationManager.configure()
                 notificationManager.onNotificationTapped = {
                     showPromotionSheet = true
                 }
