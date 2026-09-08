@@ -41,6 +41,12 @@ public final class MetabindAssistant {
     /// The MCP tools discovered from the server.
     public private(set) var tools: [MCPToolDefinition] = []
 
+    /// Preview hosts can observe refresh errors separately from chat failures.
+    public private(set) var isRefreshingProjectResources = false
+    public private(set) var projectResourceRefreshError: (any Error)?
+    private var projectResourceRefreshGeneration: UInt64 = 0
+    private var projectResourceRefreshTask: Task<Void, any Error>?
+
     /// System prompt prepended to every LLM request.
     public var systemPrompt: String?
 
@@ -228,24 +234,97 @@ public final class MetabindAssistant {
     public func loadTools() async {
         do {
             let defs = try await server.listTools()
-            let names = defs.map(\.name).joined(separator: ", ")
-            log.info("Loaded \(defs.count, privacy: .public) tools: \(names, privacy: .public)")
-
-            self.tools = defs
-            self.toolUIMap = [:]
-            self.llmTools = defs.map { def in
-                if let uri = def.ui?.resourceUri {
-                    toolUIMap[def.name] = uri
-                }
-                return LLMTool(
-                    name: def.name,
-                    description: def.description ?? "",
-                    inputSchema: def.inputSchema ?? .object([:])
-                )
-            }
+            applyToolDefinitions(defs)
         } catch {
             log.error("Failed to load tools: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    private func applyToolDefinitions(_ defs: [MCPToolDefinition]) {
+        self.tools = defs
+        self.toolUIMap = [:]
+        self.llmTools = defs.map { def in
+            if let uri = def.ui?.resourceUri { toolUIMap[def.name] = uri }
+            return LLMTool(
+                name: def.name,
+                description: def.description ?? "",
+                inputSchema: def.inputSchema ?? .object([:])
+            )
+        }
+    }
+
+    /// Refresh tool definitions and all existing UI cards, preserving the chat.
+    ///
+    /// A preview host calls this after a project change or during foreground
+    /// polling. Calls during a chat turn or another refresh are skipped; the
+    /// host can try again on the next change/poll. This never replays tool calls.
+    /// Custom MCPServer implementations should invalidate their resource cache
+    /// before calling; MCPAppsClient is invalidated automatically.
+    public func refreshProjectResources() async throws {
+        guard !isProcessing, !isRefreshingProjectResources else { return }
+        let generation = projectResourceRefreshGeneration
+        isRefreshingProjectResources = true
+        projectResourceRefreshError = nil
+        let task = Task { try await self.performProjectResourceRefresh(generation: generation) }
+        projectResourceRefreshTask = task
+        defer {
+            if generation == projectResourceRefreshGeneration {
+                isRefreshingProjectResources = false
+                projectResourceRefreshTask = nil
+            }
+        }
+
+        do {
+            try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+        } catch {
+            // A new turn or reset retires this refresh without terminating the
+            // host's foreground poll loop. Caller cancellation still propagates.
+            if Task.isCancelled { throw CancellationError() }
+            guard generation == projectResourceRefreshGeneration else { return }
+            if !(error is CancellationError) { projectResourceRefreshError = error }
+            throw error
+        }
+    }
+
+    private func performProjectResourceRefresh(generation: UInt64) async throws {
+        if let client = server as? MCPAppsClient { await client.clearResourceCache() }
+        let defs = try await server.listTools()
+        try Task.checkCancellation()
+        guard generation == projectResourceRefreshGeneration, !isProcessing else { return }
+        applyToolDefinitions(defs)
+
+        // activeSessions contains only the latest turn; the transcript owns
+        // every historical card that must reflect the edited project.
+        let sessions = conversation.messages.compactMap { message -> MCPAppSession? in
+            guard case .tool(let session) = message, session.resourceUri != nil else { return nil }
+            return session
+        }
+        var firstError: (any Error)?
+        for session in sessions {
+            try Task.checkCancellation()
+            guard generation == projectResourceRefreshGeneration else { return }
+            do {
+                try await session.reloadResource(uri: toolUIMap[session.toolName])
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                // One unavailable card should not prevent other cards updating.
+                if firstError == nil { firstError = error }
+            }
+        }
+        try Task.checkCancellation()
+        if let firstError { throw firstError }
+    }
+
+    private func cancelProjectResourceRefresh() {
+        projectResourceRefreshGeneration &+= 1
+        projectResourceRefreshTask?.cancel()
+        projectResourceRefreshTask = nil
+        isRefreshingProjectResources = false
     }
 
     /// Send a user message and begin generating a response.
@@ -261,6 +340,8 @@ public final class MetabindAssistant {
             log.info("send ignored (empty=\(text.isEmpty, privacy: .public) isProcessing=\(self.isProcessing, privacy: .public))")
             return
         }
+
+        cancelProjectResourceRefresh()
 
         // User-visible bubble stays clean; the model sees any accumulated
         // component context prefixed to the same turn.
@@ -299,6 +380,7 @@ public final class MetabindAssistant {
 
     /// Cancel the current response generation.
     public func cancel() {
+        cancelProjectResourceRefresh()
         currentTask?.cancel()
         currentTask = nil
     }
@@ -311,6 +393,7 @@ public final class MetabindAssistant {
     /// under the previous, possibly poisoned, server conversation.
     public func reset() {
         cancel()
+        projectResourceRefreshError = nil
         conversation.clear()
         llmHistory.removeAll()
         activeSessions.removeAll()

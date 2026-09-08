@@ -125,6 +125,20 @@ Same view, same observable surface, a different conversation engine.
 
 `MetabindAssistant` is `@Observable`. Its `conversation`, `isProcessing`, `tools`, and `pendingContext` are all observable, so you can build an entirely custom interface instead of using `MetabindAssistantView`.
 
+### Preview saved project edits
+
+For a project preview, initialize `MetabindAgentProvider` with `draft: true` and use the project's draft MCP endpoint. The default provider continues to use published configuration.
+
+When your host detects a saved project change, call:
+
+```swift
+try await assistant.refreshProjectResources()
+```
+
+This refreshes tool discovery and the UI resources for cards already in the conversation, preserving messages, tool arguments, and tool results. It does not replay tool calls. Unavailable resources keep their previous UI; the method throws and exposes `projectResourceRefreshError`. Calls during a chat turn or another refresh are skipped, so retry on the next change or foreground poll. The SDK does not start a polling loop itself.
+
+The BindJS renderer updates component code in place. Removing a component declaration recreates that card's runtime so deleted code cannot remain registered. Component-local state may reset after structural edits, while chat messages and tool inputs/results remain intact. Updated component code can make its own tool calls. Hosts using `MCPAppSession` directly can invalidate their client's resource cache and call `try await session.reloadResource()` to refresh one card.
+
 ### useMCPHost: components calling back into your app
 
 BindJS components rendered inside a tool result reach host capabilities through `useMCPHost()`:
