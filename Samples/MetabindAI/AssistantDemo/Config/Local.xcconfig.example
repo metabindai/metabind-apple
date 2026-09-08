@@ -1,0 +1,6 @@
+// Copy to Local.xcconfig, which is ignored by Git.
+// Leave the key empty to enter it in the app instead.
+// A configured key is bundled in Info.plist: use only a restricted demo key.
+ASSISTANT_DEMO_ORG_ID = your_org_id
+ASSISTANT_DEMO_PROJECT_ID = your_project_id
+ASSISTANT_DEMO_API_KEY =
