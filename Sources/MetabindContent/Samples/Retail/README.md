@@ -8,27 +8,31 @@ This project provides a starting point for building iOS apps whose content and U
 
 ## Requirements
 
-- Xcode 15.0 or later
-- iOS 17.0 or later
+- Xcode 26.2 or later
+- iOS 26.2 or later (the sample project's deployment target)
 - A Metabind account with valid API credentials
 
 ## Getting Started
 
 1. Clone or download this repository.
 2. Open `MetabindSampleRetail.xcodeproj` in Xcode.
-3. In `MetabindSampleRetailApp.swift`, replace the placeholder values with your credentials from the [Metabind dashboard](https://metabind.ai):
-   - `apiKey`
-   - `organizationId`
-   - `projectId`
-   - `contentId` (for your root content page)
+3. Copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig`, then fill in your API key, organization ID, project ID, and published root content ID from the [Metabind dashboard](https://metabind.ai). This file is ignored by Git; keep real credentials out of Swift source and the example file.
 4. Build and run the app on a simulator or device.
+
+Both build configurations read `Config/Local.xcconfig` through `RetailSample.xcconfig`. Xcode places these values in the app's Info.plist for the sample to read. Rebuild after changing the configuration.
+
+Use a restricted demo key with `read:content`, `read:types`, `read:packages`, `read:components`, and `read:assets`. The key is embedded in the built app; keep private test builds and credentials out of distribution.
 
 ## Project Structure
 
 ```
+Config/
+├── RetailSample.xcconfig           # Public defaults and local config include
+├── Local.xcconfig.example          # Copy to ignored Local.xcconfig
+└── Info.plist                      # Build-setting placeholders
 MetabindSampleRetail/
-├── MetabindSampleRetailApp.swift   # App entry point and main content view
-└── Assets.xcassets/                # App icons and colors
+├── MetabindSampleRetailApp.swift    # App entry point and main content view
+└── Assets.xcassets/                 # App icons and colors
 ```
 
 ## Key Concepts

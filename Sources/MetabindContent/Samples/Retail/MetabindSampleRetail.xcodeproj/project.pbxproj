@@ -12,6 +12,9 @@
 
 /* Begin PBXFileReference section */
 		07A7E1A62EE8A1EE002B8C7B /* MetabindSampleRetail.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MetabindSampleRetail.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A0D44CA10000000000000001 /* RetailSample.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = RetailSample.xcconfig; sourceTree = "<group>"; };
+		A0D44CA10000000000000002 /* Local.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = Local.xcconfig.example; sourceTree = "<group>"; };
+		A0D44CA10000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -38,8 +41,19 @@
 			isa = PBXGroup;
 			children = (
 				07A7E1A82EE8A1EE002B8C7B /* MetabindSampleRetail */,
+				A0D44CA10000000000000004 /* Config */,
 				07A7E1A72EE8A1EE002B8C7B /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		A0D44CA10000000000000004 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				A0D44CA10000000000000001 /* RetailSample.xcconfig */,
+				A0D44CA10000000000000002 /* Local.xcconfig.example */,
+				A0D44CA10000000000000003 /* Info.plist */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		07A7E1A72EE8A1EE002B8C7B /* Products */ = {
@@ -257,6 +271,7 @@
 		};
 		07A7E1B22EE8A1EF002B8C7B /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A0D44CA10000000000000001 /* RetailSample.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -265,6 +280,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -289,6 +305,7 @@
 		};
 		07A7E1B32EE8A1EF002B8C7B /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A0D44CA10000000000000001 /* RetailSample.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -297,6 +314,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

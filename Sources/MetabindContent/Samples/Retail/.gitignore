@@ -68,3 +68,6 @@ playground.xcworkspace
 
 # Crashlytics
 Crashlytics.framework/
+
+# Local sample credentials
+Config/Local.xcconfig

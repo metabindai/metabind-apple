@@ -1,0 +1,7 @@
+// Public defaults. Keep real credentials in the ignored Local.xcconfig.
+RETAIL_SAMPLE_API_KEY =
+RETAIL_SAMPLE_ORG_ID = YOUR_ORG_ID
+RETAIL_SAMPLE_PROJECT_ID = YOUR_PROJECT_ID
+RETAIL_SAMPLE_CONTENT_ID = YOUR_CONTENT_ID
+
+#include? "Local.xcconfig"

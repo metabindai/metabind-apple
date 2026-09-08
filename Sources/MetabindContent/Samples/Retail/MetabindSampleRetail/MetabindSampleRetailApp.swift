@@ -5,6 +5,7 @@
 //  A minimal example demonstrating how to integrate Metabind into a SwiftUI app.
 //
 
+import Foundation
 import SwiftUI
 import MetabindContent
 
@@ -22,14 +23,14 @@ struct MetabindSampleRetailApp: App {
 
     /// The Metabind client configured with your API credentials.
     ///
-    /// Replace the placeholder values with your actual credentials from
-    /// the Metabind dashboard at https://metabind.ai
+    /// Configure your credentials in the ignored `Config/Local.xcconfig`.
+    /// Xcode substitutes them into the app's Info.plist when building.
     @State var client = MetabindClient(
         url: URL(string: "https://api.metabind.ai/graphql")!,
         ws: URL(string: "wss://ws-api.metabind.ai")!,
-        apiKey: <#API Key#>,
-        organizationId: <#Organization ID#>,
-        projectId: <#Project ID#>
+        apiKey: Bundle.main.object(forInfoDictionaryKey: "MetabindAPIKey") as? String ?? "",
+        organizationId: Bundle.main.object(forInfoDictionaryKey: "MetabindOrgId") as? String ?? "",
+        projectId: Bundle.main.object(forInfoDictionaryKey: "MetabindProjectId") as? String ?? ""
     )
 
     var body: some Scene {
@@ -64,8 +65,10 @@ struct ContentView: View {
     var body: some View {
         NavigationStack(path: $path) {
             // Display your root content page
-            // Replace with your content ID from the Metabind dashboard
-            MetabindView(contentId: <#Content ID#>)
+            // Set your root content ID in Config/Local.xcconfig.
+            MetabindView(
+                contentId: Bundle.main.object(forInfoDictionaryKey: "MetabindContentId") as? String ?? ""
+            )
                 .onMetabindAction { action in
                     // Handle navigation to other content pages
                     if action.name == "metabind.content",
