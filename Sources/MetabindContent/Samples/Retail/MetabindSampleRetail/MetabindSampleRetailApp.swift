@@ -66,9 +66,11 @@ struct ContentView: View {
         NavigationStack(path: $path) {
             // Display your root content page
             // Set your root content ID in Config/Local.xcconfig.
-            MetabindView(
-                contentId: Bundle.main.object(forInfoDictionaryKey: "MetabindContentId") as? String ?? ""
-            )
+            ScrollView {
+                MetabindView(
+                    contentId: Bundle.main.object(forInfoDictionaryKey: "MetabindContentId") as? String ?? ""
+                )
+            }
                 .onMetabindAction { action in
                     // Handle navigation to other content pages
                     if action.name == "metabind.content",
@@ -80,7 +82,9 @@ struct ContentView: View {
                 .navigationDestination(for: Destination.self) { destination in
                     switch destination {
                     case .content(let id):
-                        MetabindView(contentId: id)
+                        ScrollView {
+                            MetabindView(contentId: id)
+                        }
                     }
                 }
         }
