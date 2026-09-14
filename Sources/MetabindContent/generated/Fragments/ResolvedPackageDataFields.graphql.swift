@@ -19,6 +19,9 @@ public struct ResolvedPackageDataFields: MetabindContent.SelectionSet, Fragment 
     .field("components", String.self),
     .field("assets", String.self),
   ] }
+  public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+    ResolvedPackageDataFields.self
+  ] }
 
   public var id: MetabindContent.ID { __data["id"] }
   public var version: String { __data["version"] }

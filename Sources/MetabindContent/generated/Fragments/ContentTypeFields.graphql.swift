@@ -20,6 +20,9 @@ public struct ContentTypeFields: MetabindContent.SelectionSet, Fragment {
     .field("schema", String.self),
     .field("updatedAt", MetabindContent.DateTime.self),
   ] }
+  public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+    ContentTypeFields.self
+  ] }
 
   public var id: MetabindContent.ID { __data["id"] }
   public var name: String { __data["name"] }

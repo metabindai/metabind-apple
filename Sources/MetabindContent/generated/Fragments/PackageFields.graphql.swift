@@ -22,6 +22,9 @@ public struct PackageFields: MetabindContent.SelectionSet, Fragment {
     .field("compiled", String.self),
     .field("resolvedRef", ResolvedRef.self),
   ] }
+  public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+    PackageFields.self
+  ] }
 
   public var id: MetabindContent.ID { __data["id"] }
   public var version: String { __data["version"] }
@@ -42,6 +45,10 @@ public struct PackageFields: MetabindContent.SelectionSet, Fragment {
     public static var __selections: [ApolloAPI.Selection] { [
       .field("__typename", String.self),
       .fragment(ComponentFields.self),
+    ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      PackageFields.Component.self,
+      ComponentFields.self
     ] }
 
     public var id: MetabindContent.ID { __data["id"] }
@@ -68,6 +75,10 @@ public struct PackageFields: MetabindContent.SelectionSet, Fragment {
     public static var __selections: [ApolloAPI.Selection] { [
       .field("__typename", String.self),
       .fragment(AssetFields.self),
+    ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      PackageFields.Asset.self,
+      AssetFields.self
     ] }
 
     public var id: MetabindContent.ID { __data["id"] }
@@ -100,6 +111,10 @@ public struct PackageFields: MetabindContent.SelectionSet, Fragment {
       .field("__typename", String.self),
       .fragment(PackageDependencyFields.self),
     ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      PackageFields.Dependency.self,
+      PackageDependencyFields.self
+    ] }
 
     public var projectId: MetabindContent.ID { __data["projectId"] }
     public var version: String { __data["version"] }
@@ -123,6 +138,10 @@ public struct PackageFields: MetabindContent.SelectionSet, Fragment {
     public static var __selections: [ApolloAPI.Selection] { [
       .field("__typename", String.self),
       .fragment(ResolvedPackageRefFields.self),
+    ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      PackageFields.ResolvedRef.self,
+      ResolvedPackageRefFields.self
     ] }
 
     public var package: MetabindContent.ID { __data["package"] }

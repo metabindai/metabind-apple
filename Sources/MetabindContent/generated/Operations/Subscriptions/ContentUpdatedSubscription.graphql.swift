@@ -27,6 +27,9 @@ public class ContentUpdatedSubscription: GraphQLSubscription {
     public static var __selections: [ApolloAPI.Selection] { [
       .field("contentUpdated", ContentUpdated.self, arguments: ["id": .variable("id")]),
     ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      ContentUpdatedSubscription.Data.self
+    ] }
 
     public var contentUpdated: ContentUpdated { __data["contentUpdated"] }
 
@@ -46,6 +49,9 @@ public class ContentUpdatedSubscription: GraphQLSubscription {
         .field("action", String.self),
         .field("timestamp", MetabindContent.DateTime.self),
       ] }
+      public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        ContentUpdatedSubscription.Data.ContentUpdated.self
+      ] }
 
       public var contentId: MetabindContent.ID { __data["contentId"] }
       public var content: Content? { __data["content"] }
@@ -64,6 +70,10 @@ public class ContentUpdatedSubscription: GraphQLSubscription {
         public static var __selections: [ApolloAPI.Selection] { [
           .field("__typename", String.self),
           .fragment(ContentFields.self),
+        ] }
+        public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+          ContentUpdatedSubscription.Data.ContentUpdated.Content.self,
+          ContentFields.self
         ] }
 
         public var id: MetabindContent.ID { __data["id"] }
@@ -100,6 +110,10 @@ public class ContentUpdatedSubscription: GraphQLSubscription {
         public static var __selections: [ApolloAPI.Selection] { [
           .field("__typename", String.self),
           .fragment(ResolvedPackageRefFields.self),
+        ] }
+        public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+          ContentUpdatedSubscription.Data.ContentUpdated.ResolvedRef.self,
+          ResolvedPackageRefFields.self
         ] }
 
         public var package: MetabindContent.ID { __data["package"] }

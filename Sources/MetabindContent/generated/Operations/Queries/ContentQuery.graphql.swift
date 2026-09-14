@@ -27,6 +27,9 @@ public class ContentQuery: GraphQLQuery {
     public static var __selections: [ApolloAPI.Selection] { [
       .field("content", Content?.self, arguments: ["id": .variable("id")]),
     ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      ContentQuery.Data.self
+    ] }
 
     public var content: Content? { __data["content"] }
 
@@ -41,6 +44,10 @@ public class ContentQuery: GraphQLQuery {
       public static var __selections: [ApolloAPI.Selection] { [
         .field("__typename", String.self),
         .fragment(ContentFields.self),
+      ] }
+      public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        ContentQuery.Data.Content.self,
+        ContentFields.self
       ] }
 
       public var id: MetabindContent.ID { __data["id"] }

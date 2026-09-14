@@ -18,6 +18,9 @@ public struct TagFields: MetabindContent.SelectionSet, Fragment {
     .field("name", String.self),
     .field("slug", String.self),
   ] }
+  public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+    TagFields.self
+  ] }
 
   public var id: MetabindContent.ID { __data["id"] }
   public var name: String { __data["name"] }
