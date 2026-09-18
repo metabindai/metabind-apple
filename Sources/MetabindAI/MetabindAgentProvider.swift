@@ -28,6 +28,10 @@ public actor MetabindAgentProvider: LLMProvider {
     public nonisolated let apiKey: String
     public nonisolated let orgId: String
     public nonisolated let projectId: String
+    /// Use the project's saved draft configuration when previewing in a host app.
+    public nonisolated let draft: Bool
+    /// Random session for anonymous published chat; never embed this in a shared link.
+    public nonisolated let guestSessionID: String
     private nonisolated let urlSession: URLSession
 
     private static let log = Logger(subsystem: "MetabindAssistant", category: "AgentProxy")
@@ -48,16 +52,20 @@ public actor MetabindAgentProvider: LLMProvider {
 
     public init(
         baseURL: URL = MetabindAgentProvider.productionHost,
-        apiKey: String,
+        apiKey: String = "",
         orgId: String,
         projectId: String,
+        draft: Bool = false,
         conversationId: String? = nil,
+        guestSessionID: String = UUID().uuidString,
         urlSession: URLSession = .shared
     ) {
         self.baseURL = baseURL
         self.apiKey = apiKey
+        self.guestSessionID = guestSessionID
         self.orgId = orgId
         self.projectId = projectId
+        self.draft = draft
         self.conversationId = conversationId
         self.urlSession = urlSession
     }
@@ -117,7 +125,12 @@ public actor MetabindAgentProvider: LLMProvider {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if apiKey.isEmpty {
+            guard !draft else { throw AgentError.httpStatus(401, "Drafts require sign-in") }
+            request.setValue(guestSessionID, forHTTPHeaderField: "X-Metabind-Guest-Session")
+        } else {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.timeoutInterval = 120
@@ -126,6 +139,7 @@ public actor MetabindAgentProvider: LLMProvider {
             "messages": try scopedMessages(messages),
             "stream": true,
         ]
+        if draft { body["draft"] = true }
         if let conversationId {
             body["conversationId"] = conversationId
         }

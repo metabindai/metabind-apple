@@ -24,7 +24,7 @@ public class MCPAppSession: Identifiable {
     nonisolated public let id: String
     nonisolated public let toolName: String
     public let toolArguments: JSONValue
-    public let resourceUri: String?
+    public private(set) var resourceUri: String?
 
     // MARK: - Observable State
 
@@ -50,6 +50,10 @@ public class MCPAppSession: Identifiable {
     /// answer. Surfaced to components as the `argumentsComplete` environment
     /// flag so they can hold a loading state until their inputs are real.
     public internal(set) var argumentsComplete: Bool = false
+
+    /// Resource refresh has its own state; it never changes the tool lifecycle.
+    public private(set) var isReloadingResource = false
+    public private(set) var resourceReloadError: (any Error)?
 
     /// Sendable model-layer phase. No view content.
     public enum Phase: Sendable {
@@ -84,7 +88,12 @@ public class MCPAppSession: Identifiable {
 
     private(set) var server: (any MCPServer)?
     private(set) var resolvedContent: ResolvedAppContent?
+    /// Recreate only this card's runtime when removed declarations would
+    /// otherwise remain registered in the current BindJS context.
+    private(set) var resourceContextRevision: UInt64 = 0
     private var executionTask: Task<Void, Never>?
+    private var resourceReloadTask: Task<ResolvedAppContent, any Error>?
+    private var resourceReloadGeneration: UInt64 = 0
     private let autoExecute: Bool
     /// Whether a server has been connected (used by MCPAppView to avoid re-connecting).
     private(set) var hasServerConnected = false
@@ -306,6 +315,57 @@ public class MCPAppSession: Identifiable {
         }
     }
 
+    /// Refetch the UI for this invocation without executing the tool again.
+    ///
+    /// The caller invalidates its server's resource cache first. Existing UI,
+    /// arguments, result, and phase stay intact, including when refresh fails.
+    /// Pass a URI when an updated tool definition points to a different resource.
+    public func reloadResource(uri: String? = nil) async throws {
+        guard let uri = uri ?? resourceUri else { return }
+        resourceReloadGeneration &+= 1
+        let generation = resourceReloadGeneration
+        resourceReloadTask?.cancel()
+        isReloadingResource = true
+        resourceReloadError = nil
+        defer {
+            if generation == resourceReloadGeneration {
+                isReloadingResource = false
+                resourceReloadTask = nil
+            }
+        }
+
+        do {
+            // Initial resource loading must not overwrite the refreshed content.
+            await executionTask?.value
+            try Task.checkCancellation()
+            guard generation == resourceReloadGeneration else { throw CancellationError() }
+            let task = Task { try await self.resolveResource(uri: uri) }
+            resourceReloadTask = task
+            let content = try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+            try Task.checkCancellation()
+            guard generation == resourceReloadGeneration else { throw CancellationError() }
+            if self.resourceUri != uri { self.resourceUri = uri }
+            if resolvedContent != content {
+                if case .bindJS(let previous) = resolvedContent,
+                   case .bindJS(let updated) = content,
+                   !Set(previous.package.components.keys).isSubset(of: Set(updated.package.components.keys)) {
+                    resourceContextRevision &+= 1
+                }
+                resolvedContent = content
+            }
+        } catch {
+            if Task.isCancelled || generation != resourceReloadGeneration { throw CancellationError() }
+            if generation == resourceReloadGeneration, !(error is CancellationError) {
+                resourceReloadError = error
+            }
+            throw error
+        }
+    }
+
     /// Await the tool result. Resolves when the session reaches a terminal phase.
     /// Returns immediately if already completed, failed, or cancelled.
     public func awaitResult() async -> ToolResult {
@@ -323,6 +383,10 @@ public class MCPAppSession: Identifiable {
     public func teardown() async {
         executionTask?.cancel()
         actionTask?.cancel()
+        resourceReloadGeneration &+= 1
+        resourceReloadTask?.cancel()
+        resourceReloadTask = nil
+        isReloadingResource = false
         // transitionTo handles resuming continuations via terminalResult
         transitionTo(.cancelled)
     }
@@ -359,10 +423,18 @@ public class MCPAppSession: Identifiable {
     // MARK: - Resource Fetching (shared)
 
     private func fetchAndResolveResource() async throws {
-        guard let uri = resourceUri, let server else {
+        guard let uri = resourceUri else {
             log.info("[\(self.toolName, privacy: .public)] No resource URI, skipping fetch")
             return
         }
+
+        let content = try await resolveResource(uri: uri)
+        try Task.checkCancellation()
+        resolvedContent = content
+    }
+
+    private func resolveResource(uri: String) async throws -> ResolvedAppContent {
+        guard let server else { throw SessionError.noServer }
 
         log.info("[\(self.toolName, privacy: .public)] Fetching resource: \(uri, privacy: .public)")
         // How long the card sat waiting for its own definition before it could
@@ -381,8 +453,9 @@ public class MCPAppSession: Identifiable {
             throw MCPAppError.unsupportedContentType(mimeType: resource.mimeType)
         }
         log.info("[\(self.toolName, privacy: .public)] Resolving with \(String(describing: type(of: resolver)), privacy: .public)")
-        resolvedContent = try await resolver.resolve(resource)
+        let content = try await resolver.resolve(resource)
         try Task.checkCancellation()
+        return content
     }
 
     // MARK: - Execution
@@ -444,7 +517,9 @@ public class MCPAppSession: Identifiable {
             guard let self else { return }
             do {
                 try await self.fetchAndResolveResource()
-                self.transitionTo(targetPhase)
+                // A remote result can finish while its initial UI fetch is in
+                // flight. Loading the UI must not revert a completed invocation.
+                if case .loading = self.phase { self.transitionTo(targetPhase) }
             } catch is CancellationError {
                 self.transitionTo(.cancelled)
             } catch let error as MCPAppError {

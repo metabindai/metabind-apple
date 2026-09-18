@@ -35,7 +35,12 @@ public actor MCPAppsClient: MCPServer {
 
     /// Resource reads currently in flight, keyed by URI. A prefetch and a real
     /// render of the same card share one request rather than racing to issue two.
-    private var inFlightReads: [String: Task<ResourceContent, any Error>] = [:]
+    private struct ResourceRead {
+        let id: UUID
+        let task: Task<ResourceContent, any Error>
+    }
+    private var inFlightReads: [String: ResourceRead] = [:]
+    private var resourceCacheGeneration: UInt64 = 0
 
     /// Protocol versions this client can accept.
     private static let supportedVersions: Set<String> = ["2025-03-26", "2024-11-05"]
@@ -167,12 +172,23 @@ public actor MCPAppsClient: MCPServer {
         // issuing a second request for the same bytes.
         if let inFlight = inFlightReads[uri] {
             log.info("resources/read → \(uri) (in flight)")
-            return try await inFlight.value
+            return try await inFlight.task.value
         }
 
-        let task = Task { try await self.performResourceRead(uri: uri) }
-        inFlightReads[uri] = task
-        defer { inFlightReads[uri] = nil }
+        let id = UUID()
+        let generation = resourceCacheGeneration
+        let task = Task {
+            let resource = try await self.performResourceRead(uri: uri)
+            try Task.checkCancellation()
+            guard generation == self.resourceCacheGeneration else { throw CancellationError() }
+            self.resourceCache.set(uri, resource)
+            return resource
+        }
+        inFlightReads[uri] = ResourceRead(id: id, task: task)
+        defer {
+            // A retired read must not remove a newer request for the same URI.
+            if inFlightReads[uri]?.id == id { inFlightReads[uri] = nil }
+        }
         return try await task.value
     }
 
@@ -214,7 +230,6 @@ public actor MCPAppsClient: MCPServer {
             blob: (first["blob"] as? String).flatMap { Data(base64Encoded: $0) }
         )
 
-        resourceCache.set(uri, resource)
         return resource
     }
 
@@ -272,7 +287,11 @@ public actor MCPAppsClient: MCPServer {
 
     /// Clears the resource cache. Call when the server notifies that resources have changed.
     public func clearResourceCache() {
+        resourceCacheGeneration &+= 1
         resourceCache.removeAll()
+        let retired = inFlightReads.values
+        inFlightReads.removeAll()
+        for read in retired { read.task.cancel() }
     }
 
     // MARK: - Initialization
@@ -409,7 +428,7 @@ public actor MCPAppsClient: MCPServer {
         isInitialized = false
         initializationTask = nil
         sessionId = nil
-        resourceCache.removeAll()
+        clearResourceCache()
     }
 
     private func sendRequestRaw(method: String, params: [String: Any]) async throws -> ([String: Any], HTTPURLResponse) {

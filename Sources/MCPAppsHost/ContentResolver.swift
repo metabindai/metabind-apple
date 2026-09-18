@@ -10,7 +10,7 @@ public protocol ContentResolver: Sendable {
 }
 
 /// What a ContentResolver produces.
-public enum ResolvedAppContent: Sendable {
+public enum ResolvedAppContent: Sendable, Equatable {
     case bindJS(ResolvedContent)
     case html(String)
 }
@@ -19,9 +19,8 @@ public enum ResolvedAppContent: Sendable {
 
 /// Resolves BindJS content into native SwiftUI views via bindjs-apple.
 ///
-/// Caches the package components after the first decode. Subsequent resources
-/// with the same package version skip the expensive full parse and only
-/// extract the layout component name.
+/// Caches decoded resource content by its complete wire representation. Saved
+/// drafts and different projects can share version strings without sharing code.
 public struct BindJSResolver: ContentResolver, Sendable {
     public init() {}
 
@@ -36,17 +35,14 @@ public struct BindJSResolver: ContentResolver, Sendable {
             throw ContentResolverError.noTextContent
         }
 
-        // Fast path: if we've already decoded this package version, resolve
-        // by looking up the layout component in the cached dict.
+        // Exact content identity prevents draft edits or another project's
+        // matching version string from reusing stale component sources.
         if let cached = BindJSPackageCache.shared.resolve(text: text) {
             return .bindJS(cached)
         }
 
-        // Full decode (first time for this package version)
         let bundle = try JSONDecoder().decode(BindJSBundle.self, from: Data(text.utf8))
-        if let layoutName = bundle.layoutComponentName {
-            BindJSPackageCache.shared.store(layoutName: layoutName, content: bundle.resolvedContent)
-        }
+        BindJSPackageCache.shared.store(text: text, content: bundle.resolvedContent)
         return .bindJS(bundle.resolvedContent)
     }
 }
@@ -183,7 +179,7 @@ public let defaultResolvers: [any ContentResolver] = [BindJSResolver(), HTMLReso
 
 /// Process-wide caches MCPAppsHost keeps outside any one client.
 public enum MCPAppsCaches {
-    /// Drops the decoded BindJS component package shared by every `ui://` resource.
+    /// Drops decoded BindJS resources cached across clients.
     ///
     /// Independent of a client's resource cache: that one holds the fetched
     /// bytes, this one holds the parse of them. A debug reset wants both.
@@ -194,74 +190,51 @@ public enum MCPAppsCaches {
 
 // MARK: - Package Cache
 
-/// Caches the full component dictionary from the server's BindJS package.
-/// The server sends all ~26 components with every resource read; only
-/// `layoutComponentName` changes. After one full JSON decode, subsequent
-/// resources resolve by dictionary lookup instead of re-parsing ~40KB.
-///
-/// Cache entries expire after `ttl` seconds (default 5 minutes).
+/// A bounded cache keyed by the complete resource text, including its package
+/// sources and selected layout. Version labels alone are not content identities:
+/// drafts keep their version while changing, and projects can reuse versions.
 final class BindJSPackageCache: @unchecked Sendable {
     static let shared = BindJSPackageCache()
 
-    private var cachedVersion: String?
-    private var allComponents: [String: String] = [:]
-    private var cachedAt: Date = .distantPast
+    private struct Entry {
+        let content: ResolvedContent
+        let createdAt: Date
+    }
+    private var entries: [String: Entry] = [:]
+    private var order: [String] = []
     private let lock = NSLock()
+    private let maxEntries = 50
+    var ttl: TimeInterval = 300
 
-    /// Time-to-live for cached packages. After this duration, the next
-    /// resolve triggers a full re-decode to pick up server-side updates.
-    var ttl: TimeInterval = 300 // 5 minutes
-
-    /// Lightweight struct for extracting just the two top-level keys without parsing
-    /// the full ~40KB `package.compiled.components` blob.
-    private struct Header: Decodable {
-        let layoutComponentName: String
-        let packageVersion: String
-    }
-
-    /// Try to resolve from the cached package. Returns nil on miss or expiry.
     func resolve(text: String) -> ResolvedContent? {
-        guard let header = try? JSONDecoder().decode(Header.self, from: Data(text.utf8)) else {
-            return nil
-        }
-
         lock.lock()
         defer { lock.unlock() }
-
-        // Check version match AND TTL
-        guard header.packageVersion == cachedVersion,
-              !allComponents.isEmpty,
-              Date().timeIntervalSince(cachedAt) < ttl else {
+        guard let entry = entries[text] else { return nil }
+        guard Date().timeIntervalSince(entry.createdAt) < ttl else {
+            entries[text] = nil
+            order.removeAll { $0 == text }
             return nil
         }
-
-        let compiled = allComponents[header.layoutComponentName] ?? ""
-        let components = allComponents.filter { $0.key != header.layoutComponentName }
-
-        return ResolvedContent(
-            compiled: compiled,
-            package: PackageComponents(version: header.packageVersion, components: components)
-        )
+        order.removeAll { $0 == text }
+        order.append(text)
+        return entry.content
     }
 
-    /// Store the full component set after a decode.
-    func store(layoutName: String, content: ResolvedContent) {
+    func store(text: String, content: ResolvedContent) {
         lock.lock()
         defer { lock.unlock() }
-
-        cachedVersion = content.package.version
-        allComponents = content.package.components
-        allComponents[layoutName] = content.compiled
-        cachedAt = Date()
+        entries[text] = Entry(content: content, createdAt: Date())
+        order.removeAll { $0 == text }
+        order.append(text)
+        while order.count > maxEntries {
+            entries[order.removeFirst()] = nil
+        }
     }
 
-    /// Explicitly invalidate the cache.
     func invalidate() {
         lock.lock()
         defer { lock.unlock() }
-
-        cachedVersion = nil
-        allComponents.removeAll()
-        cachedAt = .distantPast
+        entries.removeAll()
+        order.removeAll()
     }
 }
