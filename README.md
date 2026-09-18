@@ -125,6 +125,20 @@ Same view, same observable surface, a different conversation engine.
 
 `MetabindAssistant` is `@Observable`. Its `conversation`, `isProcessing`, `tools`, and `pendingContext` are all observable, so you can build an entirely custom interface instead of using `MetabindAssistantView`.
 
+### Published chat without sign-in
+
+For a public MCP project, use its published endpoint (without `/draft`) and
+omit `apiKey` when constructing `MetabindAgentProvider`. The Agent service
+checks the project's public visibility on each request. Drafts and private
+projects still require credentials. No language-model provider key belongs in
+the client.
+
+The SDK creates a random `guestSessionID` per provider and sends it in
+`X-Metabind-Guest-Session` to isolate conversation history. To resume a guest
+conversation across provider instances, retain both that identifier and the
+conversation ID privately; never include them in shared project links.
+Guest chat requires an Agent deployment supporting public chat.
+
 ### Preview saved project edits
 
 For a project preview, initialize `MetabindAgentProvider` with `draft: true` and use the project's draft MCP endpoint. The default provider continues to use published configuration.

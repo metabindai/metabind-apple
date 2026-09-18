@@ -57,6 +57,30 @@ struct MetabindAgentProviderTests {
         }
     }
 
+    @Test func publicChatOmitsAuthorizationAndKeepsGuestSessionAcrossTurns() async throws {
+        defer { MockURLProtocol.uninstall() }
+        let session = MockURLProtocol.install { _ in .sse("event: message_stop\ndata: {\"stopReason\":\"end_turn\"}\n\n") }
+        let provider = MetabindAgentProvider(baseURL: Self.baseURL, orgId: "org", projectId: "project", urlSession: session)
+        _ = await collect(provider.stream(messages: [.user("Hello")], tools: nil, systemPrompt: nil))
+        let first = try #require(MockURLProtocol.capturedRequest())
+        #expect(first.value(forHTTPHeaderField: "Authorization") == nil)
+        let guest = try #require(first.value(forHTTPHeaderField: "X-Metabind-Guest-Session"))
+        #expect(UUID(uuidString: guest) != nil)
+        _ = await collect(provider.stream(messages: [.user("Again")], tools: nil, systemPrompt: nil))
+        #expect(MockURLProtocol.capturedRequest()?.value(forHTTPHeaderField: "X-Metabind-Guest-Session") == guest)
+        let other = MetabindAgentProvider(orgId: "org", projectId: "project")
+        #expect(other.guestSessionID != guest)
+    }
+
+    @Test func anonymousDraftIsRejectedBeforeNetworkRequest() async throws {
+        defer { MockURLProtocol.uninstall() }
+        let session = MockURLProtocol.install { _ in .sse("") }
+        let provider = MetabindAgentProvider(orgId: "org", projectId: "project", draft: true, urlSession: session)
+        let events = await collect(provider.stream(messages: [.user("Hello")], tools: nil, systemPrompt: nil))
+        #expect(MockURLProtocol.capturedRequest() == nil)
+        #expect(events.contains { if case .error = $0 { return true }; return false })
+    }
+
     // MARK: - Request shape
 
     @Test func buildsExpectedRequest() async throws {
