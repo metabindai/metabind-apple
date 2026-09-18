@@ -24,12 +24,15 @@ public struct AnthropicProvider: LLMProvider {
     ///
     /// - Parameters:
     ///   - apiKey: Your Anthropic API key.
-    ///   - model: The model identifier.
+    ///   - model: The model identifier. The default tracks a current Claude
+    ///     model; pin it explicitly if your app needs a specific one, and
+    ///     check https://docs.claude.com/en/docs/about-claude/model-deprecations
+    ///     before a release — retired model IDs are rejected by the API.
     ///   - maxTokens: Maximum tokens in the response.
     ///   - urlSession: Transport, injectable for tests. Defaults to `.shared`.
     public init(
         apiKey: String,
-        model: String = "claude-sonnet-4-20250514",
+        model: String = "claude-sonnet-4-6",
         maxTokens: Int = 8192,
         urlSession: URLSession = .shared
     ) {
