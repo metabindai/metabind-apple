@@ -77,6 +77,25 @@ struct PartialJSONTests {
         #expect(PartialJSON.parse(buf) == .object(["a": .object(["b": .array([.string("x"), .string("y")])])]))
     }
 
+    @Test func pathologicallyDeepNestingDoesNotOverflowStack() {
+        // A runaway or adversarial stream (e.g. a malformed tool-argument
+        // buffer) can accumulate thousands of open brackets before the next
+        // delta arrives. The parser must degrade gracefully instead of
+        // recursing once per nesting level and blowing the call stack.
+        let buf = String(repeating: "[", count: 100_000)
+        let result = PartialJSON.parse(buf)
+        #expect(result != nil)
+        #expect(depth(of: result!) <= 64)
+    }
+
+    private func depth(of value: JSONValue) -> Int {
+        switch value {
+        case .array(let arr): return 1 + (arr.map(depth(of:)).max() ?? 0)
+        case .object(let dict): return 1 + (dict.values.map(depth(of:)).max() ?? 0)
+        default: return 0
+        }
+    }
+
     // MARK: - Escapes
 
     @Test func truncatedUnicodeEscapeIsDropped() {
