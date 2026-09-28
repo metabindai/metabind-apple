@@ -1073,21 +1073,37 @@ struct MCPAppsClientTests {
             #expect(list.urlRequest.value(forHTTPHeaderField: "Mcp-Session-Id") == "legacy-session")
         }
 
-        @Test func fallsBackForNonNegotiationProtocolErrorDuringProbe() async throws {
+        /// Answers `server/discover` with HTTP 400 and a modern JSON-RPC error.
+        static func probeError(_ req: CapturedRequest, code: Int, message: String, data: [String: Any]? = nil) -> (Int, [String: String], Data) {
+            var error: [String: Any] = ["code": code, "message": message]
+            error["data"] = data
+            let body: [String: Any] = ["jsonrpc": "2.0", "id": req.json?["id"] ?? 1, "error": error]
+            return (400, [:], try! JSONSerialization.data(withJSONObject: body))
+        }
+
+        @Test func retriesDiscoverOnceAfterHeaderMismatch() async throws {
+            var discoverCount = 0
             MockURLProtocol.handlers["server/discover"] = { req in
-                let body: [String: Any] = [
-                    "jsonrpc": "2.0",
-                    "id": req.json?["id"] ?? 1,
-                    "error": ["code": -32020, "message": "Mcp-Method header mismatch"]
+                discoverCount += 1
+                if discoverCount == 1 {
+                    return Self.probeError(req, code: -32020, message: "Mcp-Method header mismatch")
+                }
+                let result: [String: Any] = [
+                    "resultType": "complete",
+                    "supportedVersions": ["2026-07-28"],
+                    "capabilities": ["tools": [:]],
+                    "ttlMs": 0,
+                    "cacheScope": "private"
                 ]
-                return (400, [:], try! JSONSerialization.data(withJSONObject: body))
+                let body: [String: Any] = ["jsonrpc": "2.0", "id": req.json?["id"] ?? 2, "result": result]
+                return (200, [:], try! JSONSerialization.data(withJSONObject: body))
             }
-            registerInitHandlers(sessionId: "fallback-session", version: "2025-11-25")
+            registerInitHandlers(version: "2025-11-25")
             MockURLProtocol.handlers["tools/list"] = { req in
                 let body: [String: Any] = [
                     "jsonrpc": "2.0",
                     "id": req.json?["id"] ?? 3,
-                    "result": ["tools": []]
+                    "result": ["resultType": "complete", "tools": []]
                 ]
                 return (200, [:], try! JSONSerialization.data(withJSONObject: body))
             }
@@ -1098,9 +1114,67 @@ struct MCPAppsClientTests {
             )
             _ = try await client.listTools()
 
+            // HeaderMismatch identifies a modern server, so the client resends
+            // server/discover instead of falling back to initialize.
             #expect(MockURLProtocol.requestLog.map(\.method) == [
-                "server/discover", "initialize", "notifications/initialized", "tools/list"
+                "server/discover", "server/discover", "tools/list"
             ])
+        }
+
+        @Test func surfacesRepeatedHeaderMismatchDuringProbe() async throws {
+            MockURLProtocol.handlers["server/discover"] = { req in
+                Self.probeError(req, code: -32020, message: "Mcp-Method header mismatch")
+            }
+            registerInitHandlers(version: "2025-11-25")
+
+            let client = MCPAppsClient(
+                url: mockURL,
+                configuration: .init(maxRetries: 0, urlSession: mockSession())
+            )
+
+            do {
+                _ = try await client.listTools()
+                Issue.record("Should have thrown")
+            } catch let error as MCPClientError {
+                guard case .rpcError(let code, _, _) = error else {
+                    Issue.record("Expected rpcError, got \(error)")
+                    return
+                }
+                #expect(code == -32020)
+            }
+
+            #expect(MockURLProtocol.requestLog.map(\.method) == ["server/discover", "server/discover"])
+        }
+
+        @Test func surfacesMissingClientCapabilityDuringProbe() async throws {
+            MockURLProtocol.handlers["server/discover"] = { req in
+                Self.probeError(
+                    req,
+                    code: -32021,
+                    message: "Missing required client capability",
+                    data: ["requiredCapabilities": ["sampling": [:]]]
+                )
+            }
+            registerInitHandlers(version: "2025-11-25")
+
+            let client = MCPAppsClient(
+                url: mockURL,
+                configuration: .init(maxRetries: 0, urlSession: mockSession())
+            )
+
+            do {
+                _ = try await client.listTools()
+                Issue.record("Should have thrown")
+            } catch let error as MCPClientError {
+                guard case .rpcError(let code, _, let data) = error else {
+                    Issue.record("Expected rpcError, got \(error)")
+                    return
+                }
+                #expect(code == -32021)
+                #expect(data?.contains("sampling") == true)
+            }
+
+            #expect(MockURLProtocol.requestLog.map(\.method) == ["server/discover"])
         }
 
         @Test func fallsBackForLegacyProbeErrorWithNullID() async throws {

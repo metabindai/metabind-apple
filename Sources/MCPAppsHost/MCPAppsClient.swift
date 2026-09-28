@@ -533,16 +533,28 @@ public actor MCPAppsClient: MCPServer {
     private func probeDisposition(for error: MCPClientError) -> ProbeDisposition {
         switch error {
         case .rpcError(let code, _, let data):
-            guard code == -32022 else { return .fallBackToLegacy }
-            guard let supported = supportedVersions(in: data) else { return .fallBackToLegacy }
-
-            if supported.contains(Self.modernProtocolVersion) {
+            switch code {
+            case -32020:
+                // HeaderMismatch comes only from a modern server. Resend the
+                // request rather than falling back.
                 return .retryModern
-            }
-            if supported.contains(where: { $0 >= Self.modernProtocolVersion }) {
+            case -32021:
+                // MissingRequiredClientCapability also identifies a modern
+                // server, and resending cannot add the missing capability.
                 return .fail
+            case -32022:
+                guard let supported = supportedVersions(in: data) else { return .fallBackToLegacy }
+
+                if supported.contains(Self.modernProtocolVersion) {
+                    return .retryModern
+                }
+                if supported.contains(where: { $0 >= Self.modernProtocolVersion }) {
+                    return .fail
+                }
+                return .fallBackToLegacy
+            default:
+                return .fallBackToLegacy
             }
-            return .fallBackToLegacy
         case .serverError(let status, _):
             return (400..<500).contains(status) && status != 401 && status != 403 && status != 429
                 ? .fallBackToLegacy
