@@ -17,6 +17,9 @@ public struct ResolvedPackageRefFields: MetabindContent.SelectionSet, Fragment {
     .field("package", MetabindContent.ID.self),
     .field("dependencies", [MetabindContent.ID].self),
   ] }
+  public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+    ResolvedPackageRefFields.self
+  ] }
 
   public var package: MetabindContent.ID { __data["package"] }
   public var dependencies: [MetabindContent.ID] { __data["dependencies"] }

@@ -63,6 +63,9 @@ public class AssetsQuery: GraphQLQuery {
         "limit": .variable("limit")
       ]),
     ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      AssetsQuery.Data.self
+    ] }
 
     public var assets: Assets { __data["assets"] }
 
@@ -79,6 +82,9 @@ public class AssetsQuery: GraphQLQuery {
         .field("data", [Datum].self),
         .field("pagination", Pagination.self),
       ] }
+      public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        AssetsQuery.Data.Assets.self
+      ] }
 
       public var data: [Datum] { __data["data"] }
       public var pagination: Pagination { __data["pagination"] }
@@ -94,6 +100,10 @@ public class AssetsQuery: GraphQLQuery {
         public static var __selections: [ApolloAPI.Selection] { [
           .field("__typename", String.self),
           .fragment(AssetFields.self),
+        ] }
+        public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+          AssetsQuery.Data.Assets.Datum.self,
+          AssetFields.self
         ] }
 
         public var id: MetabindContent.ID { __data["id"] }
@@ -127,6 +137,9 @@ public class AssetsQuery: GraphQLQuery {
           .field("cursor", String?.self),
           .field("hasMore", Bool.self),
           .field("limit", Int.self),
+        ] }
+        public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+          AssetsQuery.Data.Assets.Pagination.self
         ] }
 
         public var cursor: String? { __data["cursor"] }
