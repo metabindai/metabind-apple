@@ -27,6 +27,9 @@ public class ResolvedPackageDataQuery: GraphQLQuery {
     public static var __selections: [ApolloAPI.Selection] { [
       .field("resolvedPackageData", ResolvedPackageData?.self, arguments: ["packageId": .variable("packageId")]),
     ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      ResolvedPackageDataQuery.Data.self
+    ] }
 
     public var resolvedPackageData: ResolvedPackageData? { __data["resolvedPackageData"] }
 
@@ -41,6 +44,10 @@ public class ResolvedPackageDataQuery: GraphQLQuery {
       public static var __selections: [ApolloAPI.Selection] { [
         .field("__typename", String.self),
         .fragment(ResolvedPackageDataFields.self),
+      ] }
+      public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        ResolvedPackageDataQuery.Data.ResolvedPackageData.self,
+        ResolvedPackageDataFields.self
       ] }
 
       public var id: MetabindContent.ID { __data["id"] }

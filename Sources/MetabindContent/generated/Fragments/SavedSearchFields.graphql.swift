@@ -18,6 +18,9 @@ public struct SavedSearchFields: MetabindContent.SelectionSet, Fragment {
     .field("name", String.self),
     .field("type", GraphQLEnum<MetabindContent.SavedSearchType>.self),
   ] }
+  public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+    SavedSearchFields.self
+  ] }
 
   public var id: MetabindContent.ID { __data["id"] }
   public var name: String { __data["name"] }
