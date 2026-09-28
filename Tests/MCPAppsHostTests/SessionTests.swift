@@ -16,8 +16,11 @@ struct SessionTests {
         var resourceText: String = MockMCPServer.sampleBindJSResource
         var shouldFailTool: Error? = nil
         var shouldFailResource: Error? = nil
+        /// When set, `callTool` waits here until the test opens it.
+        var toolGate: ToolGate? = nil
 
         func callTool(name: String, arguments: JSONValue) async throws -> ToolResult {
+            if let toolGate { try await toolGate.wait() }
             if toolDelay > .zero { try await Task.sleep(for: toolDelay) }
             if let error = shouldFailTool { throw error }
             return toolResult
@@ -27,6 +30,55 @@ struct SessionTests {
             if resourceDelay > .zero { try await Task.sleep(for: resourceDelay) }
             if let error = shouldFailResource { throw error }
             return ResourceContent(uri: uri, mimeType: "application/json", text: resourceText)
+        }
+    }
+
+    /// Holds `callTool` until the test opens it, so a test can observe the
+    /// session while the call is in flight. Cancelling the calling task ends
+    /// the wait with `CancellationError`, as it would a real request.
+    final class ToolGate: @unchecked Sendable {
+        private let lock = NSLock()
+        private var isOpen = false
+        private var waiters: [Int: CheckedContinuation<Void, Error>] = [:]
+        private var started = 0
+        private var cancelled = 0
+
+        /// Calls that have reached the gate.
+        var callsStarted: Int { lock.withLock { started } }
+
+        /// Calls that ended at the gate because their task was cancelled.
+        var callsCancelled: Int { lock.withLock { cancelled } }
+
+        func open() {
+            lock.withLock {
+                isOpen = true
+                for waiter in waiters.values { waiter.resume() }
+                waiters = [:]
+            }
+        }
+
+        func wait() async throws {
+            let id = lock.withLock { started += 1; return started }
+            try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    lock.withLock {
+                        if isOpen {
+                            continuation.resume()
+                        } else if Task.isCancelled {
+                            cancelled += 1
+                            continuation.resume(throwing: CancellationError())
+                        } else {
+                            waiters[id] = continuation
+                        }
+                    }
+                }
+            } onCancel: {
+                lock.withLock {
+                    guard let waiter = waiters.removeValue(forKey: id) else { return }
+                    cancelled += 1
+                    waiter.resume(throwing: CancellationError())
+                }
+            }
         }
     }
 
@@ -52,7 +104,7 @@ struct SessionTests {
         #expect(session.phase.isLoading)
 
         // Wait for completion
-        try await Task.sleep(for: .milliseconds(200))
+        await waitUntil { session.phase.isTerminal }
 
         if case .completed(let result) = session.phase {
             #expect(result.content.first == .text("done"))
@@ -62,18 +114,17 @@ struct SessionTests {
     }
 
     @Test func autoSessionTransitionsThroughActive() async throws {
-        let server = TestServer(
-            toolDelay: .milliseconds(200),  // tool takes a while
-            resourceDelay: .milliseconds(10)
-        )
+        let gate = ToolGate()
+        let server = TestServer(toolGate: gate)  // tool runs until the gate opens
         let session = MCPAppSession(toolCall: makeToolCall(), server: server)
 
-        // Wait for resource to load but tool still running
-        try await Task.sleep(for: .milliseconds(50))
+        // Wait for resource to load and the tool call to start
+        await waitUntil { gate.callsStarted == 1 }
         #expect(session.phase.isActive)
 
-        // Wait for tool to complete
-        try await Task.sleep(for: .milliseconds(250))
+        // Let the tool complete
+        gate.open()
+        await waitUntil { session.phase.isTerminal }
         #expect(session.phase.isCompleted)
     }
 
@@ -83,7 +134,7 @@ struct SessionTests {
 
         #expect(session.resourceUri == nil)
 
-        try await Task.sleep(for: .milliseconds(150))
+        await waitUntil { session.phase.isTerminal }
         #expect(session.phase.isCompleted)
     }
 
@@ -94,7 +145,7 @@ struct SessionTests {
         server.shouldFailTool = NSError(domain: "test", code: 1)
         let session = MCPAppSession(toolCall: makeToolCall(), server: server)
 
-        try await Task.sleep(for: .milliseconds(100))
+        await waitUntil { session.phase.isTerminal }
 
         if case .failed = session.phase {
             // Expected
@@ -108,7 +159,7 @@ struct SessionTests {
         server.toolResult = ToolResult(text: "error details", isError: true)
         let session = MCPAppSession(toolCall: makeToolCall(hasUI: true), server: server)
 
-        try await Task.sleep(for: .milliseconds(200))
+        await waitUntil { session.phase.isTerminal }
 
         // UI tool with resolved content: isError result should still complete
         #expect(session.phase.isCompleted)
@@ -125,7 +176,7 @@ struct SessionTests {
         )
         let session = MCPAppSession(toolCall: makeToolCall(hasUI: false), server: server)
 
-        try await Task.sleep(for: .milliseconds(100))
+        await waitUntil { session.phase.isTerminal }
 
         // Data tool with no resolved content: isError should fail
         if case .failed = session.phase {
@@ -141,7 +192,7 @@ struct SessionTests {
         // BindJSResolver will fail to decode this
         let session = MCPAppSession(toolCall: makeToolCall(), server: server)
 
-        try await Task.sleep(for: .milliseconds(100))
+        await waitUntil { session.phase.isTerminal }
 
         if case .failed = session.phase {
             // Expected — content resolution failed
@@ -153,13 +204,16 @@ struct SessionTests {
     // MARK: - Cancel
 
     @Test func cancelStopsExecution() async throws {
-        let server = TestServer(toolDelay: .seconds(10))
-        let session = MCPAppSession(toolCall: makeToolCall(), server: server)
+        let gate = ToolGate()
+        let session = MCPAppSession(toolCall: makeToolCall(), server: TestServer(toolGate: gate))
 
-        try await Task.sleep(for: .milliseconds(50))
+        await waitUntil { gate.callsStarted == 1 }
         session.cancel()
 
         #expect(session.phase.isCancelled)
+
+        // The in-flight tool call is cancelled, not left to finish
+        await waitUntil { gate.callsCancelled == 1 }
     }
 
     @Test func cancelIsIdempotent() {
@@ -175,7 +229,7 @@ struct SessionTests {
         server.shouldFailTool = NSError(domain: "test", code: 1)
         let session = MCPAppSession(toolCall: makeToolCall(hasUI: false), server: server)
 
-        try await Task.sleep(for: .milliseconds(100))
+        await waitUntil { session.phase.isTerminal }
         #expect(session.phase.isFailed)
 
         // Fix the server and retry
@@ -186,10 +240,10 @@ struct SessionTests {
     }
 
     @Test func retryFromCancelled() async throws {
-        let server = TestServer(toolDelay: .seconds(10))
-        let session = MCPAppSession(toolCall: makeToolCall(), server: server)
+        let gate = ToolGate()
+        let session = MCPAppSession(toolCall: makeToolCall(), server: TestServer(toolGate: gate))
 
-        try await Task.sleep(for: .milliseconds(50))
+        await waitUntil { gate.callsStarted == 1 }
         session.cancel()
         #expect(session.phase.isCancelled)
 
@@ -208,21 +262,21 @@ struct SessionTests {
             transitions.append(phase.label)
         }
 
-        try await Task.sleep(for: .milliseconds(200))
+        await waitUntil { session.phase.isTerminal }
         #expect(transitions.contains("active"))
         #expect(transitions.contains("completed"))
     }
 
     @Test func onPhaseTransitionFiresOnCancel() async throws {
-        let server = TestServer(toolDelay: .seconds(10))
-        let session = MCPAppSession(toolCall: makeToolCall(), server: server)
+        let gate = ToolGate()
+        let session = MCPAppSession(toolCall: makeToolCall(), server: TestServer(toolGate: gate))
 
         var fired = false
         session.onPhaseTransition = { phase in
             if case .cancelled = phase { fired = true }
         }
 
-        try await Task.sleep(for: .milliseconds(50))
+        await waitUntil { gate.callsStarted == 1 }
         session.cancel()
         #expect(fired)
     }
@@ -245,6 +299,7 @@ struct SessionTests {
     @Test func pendingSessionStaysLoadingWithoutServer() async throws {
         let session = MCPAppSession(pendingToolCall: makeToolCall())
 
+        // No event marks the absence of a start, so allow 100 ms for an unwanted one to show
         try await Task.sleep(for: .milliseconds(100))
         #expect(session.phase.isLoading)
         #expect(session.server == nil)
@@ -256,7 +311,7 @@ struct SessionTests {
 
         session.connectToServer(server)
 
-        try await Task.sleep(for: .milliseconds(200))
+        await waitUntil { session.phase.isTerminal }
         #expect(session.phase.isCompleted)
     }
 
@@ -268,7 +323,7 @@ struct SessionTests {
         let server2 = TestServer(toolResult: ToolResult(text: "wrong"))
         session.connectToServer(server2)
 
-        try await Task.sleep(for: .milliseconds(100))
+        await waitUntil { session.phase.isTerminal }
 
         if case .completed(let result) = session.phase {
             #expect(result.content.first == .text("done"))
@@ -286,6 +341,7 @@ extension MCPAppSession.Phase {
     var isCompleted: Bool { if case .completed = self { return true }; return false }
     var isFailed: Bool { if case .failed = self { return true }; return false }
     var isCancelled: Bool { if case .cancelled = self { return true }; return false }
+    var isTerminal: Bool { terminalResult != nil }
 
     var label: String {
         switch self {
@@ -312,7 +368,7 @@ struct PrimitiveInitTests {
         )
         #expect(session.id == "prim-1")
         #expect(session.toolName == "test_tool")
-        try await Task.sleep(for: .milliseconds(200))
+        await waitUntil { session.phase.isTerminal }
         #expect(session.phase.isCompleted)
     }
 
@@ -334,6 +390,7 @@ struct PrimitiveInitTests {
             pendingId: "prim-3", toolName: "test_tool"
         )
         #expect(session.phase.isLoading)
+        // No event marks the absence of a start, so allow 50 ms for an unwanted one to show
         try await Task.sleep(for: .milliseconds(50))
         #expect(session.phase.isLoading)
     }
@@ -365,11 +422,12 @@ struct AwaitResultTests {
     }
 
     @Test func awaitResultOnCancelled() async throws {
-        let server = SessionTests.TestServer(toolDelay: .seconds(10))
+        let gate = SessionTests.ToolGate()
+        let server = SessionTests.TestServer(toolGate: gate)
         let session = MCPAppSession(
             id: "await-3", toolName: "test_tool", server: server
         )
-        try await Task.sleep(for: .milliseconds(50))
+        await waitUntil { gate.callsStarted == 1 }
         session.cancel()
         let result = await session.awaitResult()
         #expect(result.isError)
