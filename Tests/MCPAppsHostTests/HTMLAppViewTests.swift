@@ -71,6 +71,31 @@ struct HTMLAppCSPTests {
     }
 }
 
+// MARK: - Navigation
+
+@Suite("HTML app navigation")
+@MainActor
+struct HTMLAppNavigationTests {
+    let https = URL(string: "https://example.com/")!
+
+    @Test func allowsTheShellAndTheViewFrame() {
+        #expect(HTMLAppShell.policy(for: URL(string: "about:blank"), isMainFrame: true, navigationType: .other, allowsNestedFrames: false) == .allow)
+        #expect(HTMLAppShell.policy(for: URL(string: "about:srcdoc"), isMainFrame: false, navigationType: .other, allowsNestedFrames: false) == .allow)
+    }
+
+    @Test func blocksNavigatingAway() {
+        #expect(HTMLAppShell.policy(for: https, isMainFrame: true, navigationType: .other, allowsNestedFrames: true) == .cancel)
+        #expect(HTMLAppShell.policy(for: https, isMainFrame: false, navigationType: .other, allowsNestedFrames: false) == .cancel)
+        #expect(HTMLAppShell.policy(for: https, isMainFrame: false, navigationType: .linkActivated, allowsNestedFrames: true) == .cancel)
+        #expect(HTMLAppShell.policy(for: https, isMainFrame: false, navigationType: .formSubmitted, allowsNestedFrames: true) == .cancel)
+    }
+
+    @Test func allowsDeclaredNestedFrames() {
+        #expect(HTMLAppShell.policy(for: https, isMainFrame: false, navigationType: .other, allowsNestedFrames: true) == .allow)
+        #expect(HTMLAppShell.policy(for: URL(string: "http://example.com/"), isMainFrame: false, navigationType: .other, allowsNestedFrames: true) == .cancel)
+    }
+}
+
 // MARK: - WKWebView integration
 
 #if os(macOS)
