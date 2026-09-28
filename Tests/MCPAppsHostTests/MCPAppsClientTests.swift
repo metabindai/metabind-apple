@@ -1577,6 +1577,30 @@ struct MCPAppsClientTests {
             }
         }
 
+        @Test func toolResultRoundTripsThroughCodable() throws {
+            let original = ToolResult(content: [
+                .text("Hello"),
+                .image(Data([0x01]), mimeType: "image/png"),
+                .audio(Data([0x02]), mimeType: "audio/mpeg"),
+                .resource(uri: "ui://card", mimeType: "text/html", text: "<p>Card</p>"),
+                .resource(uri: "ui://empty", mimeType: "text/plain", text: nil),
+                .resourceBlob(uri: "data://thumbnail", mimeType: "application/octet-stream", blob: Data([0x03])),
+                .resourceLink(
+                    name: "Recipe source",
+                    title: nil,
+                    uri: "https://example.com/recipes",
+                    description: nil,
+                    mimeType: "text/html",
+                    size: 128
+                )
+            ], isError: true)
+
+            let data = try JSONEncoder().encode(original)
+            let decoded = try JSONDecoder().decode(ToolResult.self, from: data)
+
+            #expect(decoded == original)
+        }
+
         @Test func rejectsNestedEmbeddedResourceWithoutPayload() async throws {
             MockURLProtocol.reset()
             registerModernDiscoverHandler()

@@ -118,6 +118,12 @@ extension ContentBlock: Codable {
             try container.encode("audio", forKey: .type)
             try container.encode(data, forKey: .data)
             try container.encode(mimeType, forKey: .mimeType)
+        case .resource(let uri, let mimeType, nil):
+            // An embedded resource must carry text or blob, so a resource
+            // without text keeps the flattened shape the decoder accepts.
+            try container.encode("resource", forKey: .type)
+            try container.encode(uri, forKey: .uri)
+            try container.encode(mimeType, forKey: .mimeType)
         case .resource(let uri, let mimeType, let text):
             try container.encode("resource", forKey: .type)
             try container.encode(
