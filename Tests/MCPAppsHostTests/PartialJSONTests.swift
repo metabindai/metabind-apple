@@ -88,6 +88,12 @@ struct PartialJSONTests {
         #expect(depth(of: result!) <= 64)
     }
 
+    @Test func manySiblingContainersAreAllKept() {
+        // The depth cap counts nesting, not width: siblings must not add up.
+        let buf = "[" + Array(repeating: #"{"a":[1]}"#, count: 200).joined(separator: ",") + "]"
+        #expect(PartialJSON.parse(buf) == .array(Array(repeating: .object(["a": .array([.number(1)])]), count: 200)))
+    }
+
     private func depth(of value: JSONValue) -> Int {
         switch value {
         case .array(let arr): return 1 + (arr.map(depth(of:)).max() ?? 0)
