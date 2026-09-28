@@ -520,12 +520,14 @@ public class MCPAppSession: Identifiable {
                 // A remote result can finish while its initial UI fetch is in
                 // flight. Loading the UI must not revert a completed invocation.
                 if case .loading = self.phase { self.transitionTo(targetPhase) }
-            } catch is CancellationError {
-                self.transitionTo(.cancelled)
-            } catch let error as MCPAppError {
-                self.transitionTo(.failed(error))
             } catch {
-                self.transitionTo(.failed(.serverUnreachable(underlying: error)))
+                // Nor may a failed UI fetch overwrite a completed invocation.
+                guard case .loading = self.phase else { return }
+                switch error {
+                case is CancellationError: self.transitionTo(.cancelled)
+                case let error as MCPAppError: self.transitionTo(.failed(error))
+                default: self.transitionTo(.failed(.serverUnreachable(underlying: error)))
+                }
             }
         }
     }

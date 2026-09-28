@@ -18,13 +18,14 @@ private final class HeldResourceProtocol: URLProtocol, @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return reads
     }
-    static func finishResources() {
+    /// Answers the `number`th resource read, counting from 1.
+    static func finish(read number: Int, text: String) {
         lock.lock()
-        let requests = pending.filter { !$0.stopped }
-        pending.removeAll()
+        let request = pending[number - 1]
+        let stopped = request.stopped
         lock.unlock()
-        for request in requests {
-            request.respond(["contents": [["uri": "ui://card", "mimeType": "text/html", "text": "fresh"]]])
+        if !stopped {
+            request.respond(["contents": [["uri": "ui://card", "mimeType": "text/html", "text": text]]])
         }
     }
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -69,35 +70,59 @@ private final class HeldResourceProtocol: URLProtocol, @unchecked Sendable {
 
 @Suite("Resource cache generations", .serialized)
 struct ResourceCacheInvalidationTests {
-    @Test func retiringReadCannotRemoveOrPopulateNewGeneration() async throws {
+    private func makeClient() -> MCPAppsClient {
         HeldResourceProtocol.reset()
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [HeldResourceProtocol.self]
-        let client = MCPAppsClient(url: URL(string: "https://resource-cache.test/mcp")!,
-                                   configuration: .init(urlSession: URLSession(configuration: configuration)))
-        func waitForReads(_ count: Int) async throws {
-            let deadline = Date().addingTimeInterval(2)
-            while HeldResourceProtocol.readCount < count && Date() < deadline {
-                try await Task.sleep(for: .milliseconds(5))
-            }
-            #expect(HeldResourceProtocol.readCount == count)
+        return MCPAppsClient(url: URL(string: "https://resource-cache.test/mcp")!,
+                             configuration: .init(urlSession: URLSession(configuration: configuration)))
+    }
+
+    private func waitForReads(_ count: Int) async throws {
+        let deadline = Date().addingTimeInterval(2)
+        while HeldResourceProtocol.readCount < count && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(5))
         }
+        #expect(HeldResourceProtocol.readCount == count)
+    }
+
+    @Test func retiringReadCannotRemoveOrPopulateNewGeneration() async throws {
+        let client = makeClient()
         let retired = Task { try await client.readResource(uri: "ui://card") }
         try await waitForReads(1)
         await client.clearResourceCache()
         let replacement = Task { try await client.readResource(uri: "ui://card") }
         try await waitForReads(2)
-        do {
-            _ = try await retired.value
-            Issue.record("Retired read must be cancelled")
-        } catch { }
         let joined = Task { try await client.readResource(uri: "ui://card") }
         try await Task.sleep(for: .milliseconds(20))
         #expect(HeldResourceProtocol.readCount == 2, "Retired cleanup must not remove the replacement request")
-        HeldResourceProtocol.finishResources()
+        HeldResourceProtocol.finish(read: 2, text: "fresh")
         #expect(try await replacement.value.text == "fresh")
         #expect(try await joined.value.text == "fresh")
+        HeldResourceProtocol.finish(read: 1, text: "stale")
+        #expect(try await retired.value.text == "stale", "A retired read still answers its caller")
         #expect(try await client.readResource(uri: "ui://card").text == "fresh")
         #expect(HeldResourceProtocol.readCount == 2)
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func clearingCacheLeavesLoadingCardRendering(resultArrived: Bool) async throws {
+        let client = makeClient()
+        let session = ManualMCPAppSession(id: "card", toolName: "card", resourceUri: "ui://card", server: client)
+        try await waitForReads(1)
+        let result = ToolResult(text: "remote result")
+        if resultArrived { session.complete(with: result) }
+        await client.clearResourceCache()
+        HeldResourceProtocol.finish(read: 1, text: "card")
+        let deadline = Date().addingTimeInterval(2)
+        while session.resolvedContent == nil && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(session.resolvedContent == .html("card"))
+        if resultArrived {
+            #expect(session.phase.terminalResult == result)
+        } else {
+            #expect(session.phase.isActive)
+        }
     }
 }

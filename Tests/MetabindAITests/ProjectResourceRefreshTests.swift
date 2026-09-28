@@ -41,6 +41,94 @@ private actor ProjectRefreshServer: MCPServer {
     }
 }
 
+/// Serves the project through a real MCPAppsClient and holds the first
+/// resource read, so a refresh can start while a card is still loading its UI.
+private final class SlowFirstReadProtocol: URLProtocol, @unchecked Sendable {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var revision = 1
+    nonisolated(unsafe) private static var reads = 0
+    nonisolated(unsafe) private static var toolLists = 0
+    nonisolated(unsafe) private static var held: (request: SlowFirstReadProtocol, text: String)?
+    private var stopped = false
+    private var requestID: Any = NSNull()
+
+    static func reset() {
+        lock.lock(); defer { lock.unlock() }
+        revision = 1; reads = 0; toolLists = 0; held = nil
+    }
+    static func edit() {
+        lock.lock(); defer { lock.unlock() }
+        revision += 1
+    }
+    static var toolListCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return toolLists
+    }
+    static var isReadHeld: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return held != nil
+    }
+    static func releaseRead() {
+        lock.lock()
+        let read = held
+        held = nil
+        let stopped = read?.request.stopped ?? true
+        lock.unlock()
+        if let read, !stopped { read.request.respondResource(read.text) }
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func stopLoading() {
+        Self.lock.lock(); defer { Self.lock.unlock() }
+        stopped = true
+    }
+    override func startLoading() {
+        var data = request.httpBody ?? Data()
+        if let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var bytes = [UInt8](repeating: 0, count: 4096)
+            while stream.hasBytesAvailable {
+                let count = stream.read(&bytes, maxLength: bytes.count)
+                if count <= 0 { break }
+                data.append(contentsOf: bytes.prefix(count))
+            }
+        }
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        requestID = json?["id"] ?? NSNull()
+        switch json?["method"] as? String {
+        case "initialize":
+            respond(["protocolVersion": "2025-03-26"])
+        case "tools/list":
+            Self.lock.lock(); Self.toolLists += 1; Self.lock.unlock()
+            respond(["tools": [["name": "card", "inputSchema": ["type": "object"],
+                                "_meta": ["ui": ["resourceUri": "ui://card"]]]]])
+        case "resources/read":
+            Self.lock.lock()
+            Self.reads += 1
+            let text = "<p>revision \(Self.revision)</p>"
+            let hold = Self.reads == 1
+            if hold { Self.held = (self, text) }
+            Self.lock.unlock()
+            if !hold { respondResource(text) }
+        default:
+            respond([:])
+        }
+    }
+    private func respondResource(_ text: String) {
+        respond(["contents": [["uri": "ui://card", "mimeType": "text/html", "text": text]]])
+    }
+    private func respond(_ result: [String: Any]) {
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                       headerFields: ["Content-Type": "application/json"])!
+        let data = try! JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": requestID, "result": result])
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+}
+
 @Suite("Project resource refresh")
 @MainActor
 struct ProjectResourceRefreshTests {
@@ -160,5 +248,47 @@ struct ProjectResourceRefreshTests {
         #expect(assistant.projectResourceRefreshError == nil)
         #expect(assistant.tools.count == 1)
         #expect(await provider.recordedInvocations.isEmpty)
+    }
+
+    @Test func refreshKeepsCompletedCardWhoseUIIsStillLoading() async throws {
+        SlowFirstReadProtocol.reset()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SlowFirstReadProtocol.self]
+        let client = MCPAppsClient(url: URL(string: "https://project-refresh.test/mcp")!,
+                                   configuration: .init(urlSession: URLSession(configuration: configuration)))
+        let provider = FakeProvider(runsToolsRemotely: true, turns: [[
+            .toolCallStart(index: 0, id: "first", name: "card"),
+            .toolCallArgumentsFinal(index: 0, arguments: ["selection": .string("first")]),
+            .toolResult(toolCallId: "first", content: "remote result", structuredContent: nil, isError: false),
+            .done(stopReason: .endTurn)
+        ]])
+        let assistant = MetabindAssistant(server: client, provider: provider)
+        assistant.send("first turn")
+        try await finishTurn(assistant)
+        let session = try #require(assistant.conversation.messages.compactMap { message -> MCPAppSession? in
+            if case .tool(let session) = message { return session }; return nil
+        }.first)
+        var deadline = Date().addingTimeInterval(2)
+        while !SlowFirstReadProtocol.isReadHeld && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(SlowFirstReadProtocol.isReadHeld)
+        let result = try #require(session.phase.terminalResult)
+        #expect(!result.isError)
+
+        // The turn is over but the card's UI is still downloading when the host polls.
+        SlowFirstReadProtocol.edit()
+        let refresh = Task { try await assistant.refreshProjectResources() }
+        deadline = Date().addingTimeInterval(2)
+        while SlowFirstReadProtocol.toolListCount < 2 && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(SlowFirstReadProtocol.toolListCount == 2, "Refresh clears the client cache before listing tools")
+        SlowFirstReadProtocol.releaseRead()
+        try await refresh.value
+
+        #expect(session.phase.terminalResult == result)
+        #expect(session.resolvedContent == .html("<p>revision 2</p>"))
+        #expect(assistant.projectResourceRefreshError == nil)
     }
 }

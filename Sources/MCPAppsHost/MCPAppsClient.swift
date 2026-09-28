@@ -317,8 +317,10 @@ public actor MCPAppsClient: MCPServer {
             blob: (first["blob"] as? String).flatMap { Data(base64Encoded: $0) }
         )
 
-        try Task.checkCancellation()
-        guard generation == resourceCacheGeneration else { throw CancellationError() }
+        // A read retired by a cache clear still answers the callers already
+        // waiting on it, but its bytes may predate the clear, so they must not
+        // repopulate the cache.
+        guard generation == resourceCacheGeneration else { return resource }
         switch protocolEra {
         case .legacy:
             resourceCache.set(uri, CachedResource(content: resource, expiresAt: nil))
@@ -416,9 +418,9 @@ public actor MCPAppsClient: MCPServer {
     public func clearResourceCache() {
         resourceCacheGeneration &+= 1
         resourceCache.removeAll()
-        let retired = inFlightReads.values
+        // Detach in-flight reads rather than cancelling them: a card may be
+        // waiting on one, and cancelling it fails that card.
         inFlightReads.removeAll()
-        for read in retired { read.task.cancel() }
     }
 
     // MARK: - Protocol Negotiation
