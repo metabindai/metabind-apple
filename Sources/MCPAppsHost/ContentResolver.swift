@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import BindJS
 
@@ -19,8 +20,9 @@ public enum ResolvedAppContent: Sendable, Equatable {
 
 /// Resolves BindJS content into native SwiftUI views via bindjs-apple.
 ///
-/// Caches decoded resource content by its complete wire representation. Saved
-/// drafts and different projects can share version strings without sharing code.
+/// Caches decoded resource content by a digest of its complete wire
+/// representation. Saved drafts and different projects can share version
+/// strings without sharing code.
 public struct BindJSResolver: ContentResolver, Sendable {
     public init() {}
 
@@ -37,12 +39,14 @@ public struct BindJSResolver: ContentResolver, Sendable {
 
         // Exact content identity prevents draft edits or another project's
         // matching version string from reusing stale component sources.
-        if let cached = BindJSPackageCache.shared.resolve(text: text) {
+        let data = Data(text.utf8)
+        let digest = SHA256.hash(data: data)
+        if let cached = BindJSPackageCache.shared.resolve(digest: digest) {
             return .bindJS(cached)
         }
 
-        let bundle = try JSONDecoder().decode(BindJSBundle.self, from: Data(text.utf8))
-        BindJSPackageCache.shared.store(text: text, content: bundle.resolvedContent)
+        let bundle = try JSONDecoder().decode(BindJSBundle.self, from: data)
+        BindJSPackageCache.shared.store(digest: digest, content: bundle.resolvedContent)
         return .bindJS(bundle.resolvedContent)
     }
 }
@@ -190,9 +194,12 @@ public enum MCPAppsCaches {
 
 // MARK: - Package Cache
 
-/// A bounded cache keyed by the complete resource text, including its package
-/// sources and selected layout. Version labels alone are not content identities:
-/// drafts keep their version while changing, and projects can reuse versions.
+/// A bounded cache keyed by the SHA-256 of the complete resource text,
+/// including its package sources and selected layout. Version labels alone are
+/// not content identities: drafts keep their version while changing, and
+/// projects can reuse versions. The key is a digest rather than the text
+/// because hashing a ~300 KB non-ASCII `String` normalizes its Unicode and
+/// costs as much as decoding it, and keeping the text would double each entry.
 final class BindJSPackageCache: @unchecked Sendable {
     static let shared = BindJSPackageCache()
 
@@ -200,32 +207,32 @@ final class BindJSPackageCache: @unchecked Sendable {
         let content: ResolvedContent
         let createdAt: Date
     }
-    private var entries: [String: Entry] = [:]
-    private var order: [String] = []
+    private var entries: [SHA256.Digest: Entry] = [:]
+    private var order: [SHA256.Digest] = []
     private let lock = NSLock()
     private let maxEntries = 50
     var ttl: TimeInterval = 300
 
-    func resolve(text: String) -> ResolvedContent? {
+    func resolve(digest: SHA256.Digest) -> ResolvedContent? {
         lock.lock()
         defer { lock.unlock() }
-        guard let entry = entries[text] else { return nil }
+        guard let entry = entries[digest] else { return nil }
         guard Date().timeIntervalSince(entry.createdAt) < ttl else {
-            entries[text] = nil
-            order.removeAll { $0 == text }
+            entries[digest] = nil
+            order.removeAll { $0 == digest }
             return nil
         }
-        order.removeAll { $0 == text }
-        order.append(text)
+        order.removeAll { $0 == digest }
+        order.append(digest)
         return entry.content
     }
 
-    func store(text: String, content: ResolvedContent) {
+    func store(digest: SHA256.Digest, content: ResolvedContent) {
         lock.lock()
         defer { lock.unlock() }
-        entries[text] = Entry(content: content, createdAt: Date())
-        order.removeAll { $0 == text }
-        order.append(text)
+        entries[digest] = Entry(content: content, createdAt: Date())
+        order.removeAll { $0 == digest }
+        order.append(digest)
         while order.count > maxEntries {
             entries[order.removeFirst()] = nil
         }

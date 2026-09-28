@@ -1,3 +1,4 @@
+import CryptoKit
 import Testing
 import Foundation
 @testable import MCPAppsHost
@@ -167,6 +168,11 @@ struct ResolverTests {
         #expect(contentB.compiled == "const b = 2")
         #expect(contentB.package.components["LayoutA"] == "const a = 1")
         #expect(contentB.package.components["LayoutB"] == nil) // removed as layout
+
+        // Entries are keyed by a digest of the bytes, not the String: hashing a
+        // large non-ASCII String costs as much as the decode the cache saves.
+        let text = try #require(makeResource(layout: "LayoutA").text)
+        #expect(BindJSPackageCache.shared.resolve(digest: SHA256.hash(data: Data(text.utf8))) == contentA)
     }
 
     // MARK: - Default resolvers
