@@ -3,29 +3,47 @@ import Testing
 @testable import MCPAppsHost
 
 /// Holds resource responses so invalidation can race a real URLSession request.
+/// Hands out legacy session ids s1, s2, …; a request on an expired one gets 404.
 private final class HeldResourceProtocol: URLProtocol, @unchecked Sendable {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var pending: [HeldResourceProtocol] = []
     nonisolated(unsafe) private static var reads = 0
+    nonisolated(unsafe) private static var holdsReads = true
+    nonisolated(unsafe) private static var sessions = 0
+    nonisolated(unsafe) private static var expiredSessions: Set<String> = []
     private var stopped = false
     private var requestID: Any = NSNull()
+    private var session: String?
 
     static func reset() {
         lock.lock(); defer { lock.unlock() }
-        pending = []; reads = 0
+        pending = []; reads = 0; holdsReads = true; sessions = 0; expiredSessions = []
     }
     static var readCount: Int {
         lock.lock(); defer { lock.unlock() }
         return reads
     }
-    /// Answers the `number`th resource read, counting from 1.
+    /// Later resource reads answer "fresh" immediately.
+    static func stopHoldingReads() {
+        lock.lock(); defer { lock.unlock() }
+        holdsReads = false
+    }
+    static func expire(session: String) {
+        lock.lock(); defer { lock.unlock() }
+        expiredSessions.insert(session)
+    }
+    /// Answers the `number`th held resource read, counting from 1.
     static func finish(read number: Int, text: String) {
         lock.lock()
         let request = pending[number - 1]
         let stopped = request.stopped
+        let expired = request.session.map(expiredSessions.contains) ?? false
         lock.unlock()
-        if !stopped {
-            request.respond(["contents": [["uri": "ui://card", "mimeType": "text/html", "text": text]]])
+        if stopped { return }
+        if expired {
+            request.send(status: 404, body: Data("Session not found".utf8))
+        } else {
+            request.respondResource(text)
         }
     }
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -44,13 +62,25 @@ private final class HeldResourceProtocol: URLProtocol, @unchecked Sendable {
         }
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         requestID = json?["id"] ?? NSNull()
+        session = request.value(forHTTPHeaderField: "Mcp-Session-Id")
+        Self.lock.lock()
+        let expired = session.map(Self.expiredSessions.contains) ?? false
+        Self.lock.unlock()
+        if expired { return send(status: 404, body: Data("Session not found".utf8)) }
         switch json?["method"] as? String {
         case "resources/read":
             Self.lock.lock()
             Self.reads += 1
-            Self.pending.append(self)
+            let hold = Self.holdsReads
+            if hold { Self.pending.append(self) }
             Self.lock.unlock()
-        case "initialize": respond(["protocolVersion": "2025-03-26"])
+            if !hold { respondResource("fresh") }
+        case "initialize":
+            Self.lock.lock()
+            Self.sessions += 1
+            let session = "s\(Self.sessions)"
+            Self.lock.unlock()
+            respond(["protocolVersion": "2025-03-26"], headers: ["Mcp-Session-Id": session])
         default: respond([:])
         }
     }
@@ -58,12 +88,18 @@ private final class HeldResourceProtocol: URLProtocol, @unchecked Sendable {
         Self.lock.lock(); defer { Self.lock.unlock() }
         stopped = true
     }
-    private func respond(_ result: [String: Any]) {
-        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
-                                       headerFields: ["Content-Type": "application/json"])!
+    private func respondResource(_ text: String) {
+        respond(["contents": [["uri": "ui://card", "mimeType": "text/html", "text": text]]])
+    }
+    private func respond(_ result: [String: Any], headers: [String: String] = [:]) {
         let data = try! JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": requestID, "result": result])
+        send(status: 200, body: data, headers: headers)
+    }
+    private func send(status: Int, body: Data, headers: [String: String] = [:]) {
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
+                                       headerFields: headers.merging(["Content-Type": "application/json"]) { $1 })!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocol(self, didLoad: body)
         client?.urlProtocolDidFinishLoading(self)
     }
 }
@@ -124,5 +160,20 @@ struct ResourceCacheInvalidationTests {
         } else {
             #expect(session.phase.isActive)
         }
+    }
+
+    @Test func readRecoversFromExpiredSessionAndStaysCached() async throws {
+        let client = makeClient()
+        let read = Task { try await client.readResource(uri: "ui://card") }
+        try await waitForReads(1)
+        HeldResourceProtocol.expire(session: "s1")
+        HeldResourceProtocol.stopHoldingReads()
+        // The server answers the held read with 404; the client re-initializes and retries.
+        HeldResourceProtocol.finish(read: 1, text: "stale")
+        #expect(try await read.value.text == "fresh")
+        #expect(HeldResourceProtocol.readCount == 2)
+        // A new session is not a resource change, so the retried read is cached.
+        #expect(try await client.readResource(uri: "ui://card").text == "fresh")
+        #expect(HeldResourceProtocol.readCount == 2)
     }
 }

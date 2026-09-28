@@ -766,7 +766,9 @@ public actor MCPAppsClient: MCPServer {
         protocolVersion = nil
         sessionId = nil
         toolHeaderMappings.removeAll()
-        clearResourceCache()
+        // A new session is not a resource change. Reads in flight retry on it,
+        // so they stay shared and may still populate the cache.
+        resourceCache.removeAll()
     }
 
     private func sendRequestRaw(
