@@ -1276,6 +1276,68 @@ struct MCPAppsClientTests {
             #expect(second.text == "{\"reading\":2}")
         }
 
+        /// Registers a modern resources/read handler whose results carry `ttlMs`
+        /// (omitted when nil) and returns the number of reads served.
+        static func registerModernResourceRead(ttlMs: Int?) -> () -> Int {
+            var readCount = 0
+            MockURLProtocol.handlers["resources/read"] = { req in
+                readCount += 1
+                var result: [String: Any] = [
+                    "resultType": "complete",
+                    "cacheScope": "private",
+                    "contents": [[
+                        "uri": "ui://metabind/render/card",
+                        "mimeType": "application/vnd.bindjs+json",
+                        "text": "{\"reading\":\(readCount)}"
+                    ]]
+                ]
+                result["ttlMs"] = ttlMs
+                let body: [String: Any] = [
+                    "jsonrpc": "2.0", "id": req.json?["id"] ?? 2, "result": result
+                ]
+                return (200, [:], try! JSONSerialization.data(withJSONObject: body))
+            }
+            return { readCount }
+        }
+
+        @Test func cachesModernResourceForServerTTL() async throws {
+            registerModernDiscoverHandler()
+            let readCount = Self.registerModernResourceRead(ttlMs: 60_000)
+
+            let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+            for _ in 0..<3 {
+                let resource = try await client.readResource(uri: "ui://metabind/render/card")
+                #expect(resource.text == "{\"reading\":1}")
+            }
+
+            #expect(readCount() == 1)
+        }
+
+        @Test func refetchesModernResourceOnceTTLExpires() async throws {
+            registerModernDiscoverHandler()
+            let readCount = Self.registerModernResourceRead(ttlMs: 1)
+
+            let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+            let first = try await client.readResource(uri: "ui://metabind/render/card")
+            try await Task.sleep(nanoseconds: 20_000_000)
+            let second = try await client.readResource(uri: "ui://metabind/render/card")
+
+            #expect(readCount() == 2)
+            #expect(first.text == "{\"reading\":1}")
+            #expect(second.text == "{\"reading\":2}")
+        }
+
+        @Test func doesNotCacheModernResourceWithoutTTL() async throws {
+            registerModernDiscoverHandler()
+            let readCount = Self.registerModernResourceRead(ttlMs: nil)
+
+            let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+            _ = try await client.readResource(uri: "ui://metabind/render/card")
+            _ = try await client.readResource(uri: "ui://metabind/render/card")
+
+            #expect(readCount() == 2)
+        }
+
         @Test func rejectsUnsupportedMultiRoundTripResult() async throws {
             registerModernDiscoverHandler()
             MockURLProtocol.handlers["tools/call"] = { req in

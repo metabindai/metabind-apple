@@ -52,6 +52,18 @@ public actor MCPAppsClient: MCPServer {
         var errorDescription: String? { "Invalid server/discover response: \(reason)" }
     }
 
+    /// A cached resource read. Legacy reads have no expiry; a 2026-07-28 read
+    /// is fresh until its `ttlMs` elapses.
+    private struct CachedResource: Sendable {
+        let content: ResourceContent
+        let expiresAt: Date?
+
+        var isFresh: Bool {
+            guard let expiresAt else { return true }
+            return Date() < expiresAt
+        }
+    }
+
     private let url: URL
     private let resolvers: [any ContentResolver]
     private let configuration: Configuration
@@ -66,7 +78,7 @@ public actor MCPAppsClient: MCPServer {
     private var toolHeaderMappings: [String: [ToolHeaderMapping]] = [:]
 
     /// LRU resource cache keyed by URI.
-    private var resourceCache: OrderedCache<String, ResourceContent>
+    private var resourceCache: OrderedCache<String, CachedResource>
 
     /// Resource reads currently in flight, keyed by URI. A prefetch and a real
     /// render of the same card share one request rather than racing to issue two.
@@ -228,9 +240,9 @@ public actor MCPAppsClient: MCPServer {
     public func readResource(uri: String) async throws -> ResourceContent {
         try await ensureConnected()
 
-        if protocolEra == .legacy, let cached = resourceCache.get(uri) {
+        if let cached = resourceCache.get(uri), cached.isFresh {
             log.info("resources/read → \(uri) (cached)")
-            return cached
+            return cached.content
         }
 
         // A prefetch may already be fetching this URI. Wait on it rather than
@@ -288,8 +300,22 @@ public actor MCPAppsClient: MCPServer {
             blob: (first["blob"] as? String).flatMap { Data(base64Encoded: $0) }
         )
 
-        if protocolEra == .legacy {
-            resourceCache.set(uri, resource)
+        switch protocolEra {
+        case .legacy:
+            resourceCache.set(uri, CachedResource(content: resource, expiresAt: nil))
+        case .modern:
+            // Keep a 2026-07-28 result only for the ttlMs the server grants.
+            // Zero, negative, or absent ttlMs means immediately stale.
+            if let ttlMs = result["ttlMs"] as? NSNumber, !isJSONBoolean(ttlMs), ttlMs.doubleValue > 0 {
+                resourceCache.set(uri, CachedResource(
+                    content: resource,
+                    expiresAt: Date().addingTimeInterval(ttlMs.doubleValue / 1000)
+                ))
+            } else {
+                resourceCache.remove(uri)
+            }
+        case nil:
+            break
         }
         return resource
     }
