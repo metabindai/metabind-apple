@@ -9,14 +9,15 @@ private actor ProjectRefreshServer: MCPServer {
     var reads = 0
     var failDiscovery = false
     var holdReads = false
-    var heldRead: CheckedContinuation<Void, Never>?
+    var heldReads: [CheckedContinuation<Void, Never>] = []
 
     func beginHoldingReads() { holdReads = true }
-    var isReadHeld: Bool { heldRead != nil }
+    var isReadHeld: Bool { !heldReads.isEmpty }
+    var heldReadCount: Int { heldReads.count }
     func releaseRead() {
         holdReads = false
-        heldRead?.resume()
-        heldRead = nil
+        heldReads.forEach { $0.resume() }
+        heldReads = []
     }
 
     func edit(failDiscovery: Bool = false) {
@@ -31,7 +32,7 @@ private actor ProjectRefreshServer: MCPServer {
 
     func readResource(uri: String) async throws -> ResourceContent {
         reads += 1
-        if holdReads { await withCheckedContinuation { heldRead = $0 } }
+        if holdReads { await withCheckedContinuation { heldReads.append($0) } }
         return ResourceContent(uri: uri, mimeType: "text/html", text: "<p>revision \(revision)</p>")
     }
 
@@ -184,6 +185,35 @@ struct ProjectResourceRefreshTests {
         await server.releaseRead()
         await #expect(throws: CancellationError.self) { try await refresh.value }
         #expect(session.resolvedContent == content)
+        #expect(assistant.projectResourceRefreshError == nil)
+        #expect(!assistant.isRefreshingProjectResources)
+    }
+
+    @Test func cardReloadedByHostDuringRefreshIsSkippedWithoutEndingPolling() async throws {
+        let server = ProjectRefreshServer()
+        let assistant = MetabindAssistant(server: server, provider: FakeProvider(runsToolsRemotely: true, turns: []))
+        let sessions = ["first", "second"].map {
+            MCPAppSession(id: $0, toolName: "card", resourceUri: "ui://card/1",
+                          completedWith: ToolResult(text: "\($0) result"), server: server)
+        }
+        for session in sessions {
+            _ = await session.awaitResult()
+            assistant.conversation.append(.tool(session))
+        }
+        await server.edit()
+        await server.beginHoldingReads()
+        let refresh = Task { try await assistant.refreshProjectResources() }
+        try await waitForHeldRead(server)
+        // The host reloads the first card itself, superseding the refresh's reload of it.
+        let direct = Task { try await sessions[0].reloadResource() }
+        let deadline = Date().addingTimeInterval(2)
+        while await server.heldReadCount < 2 && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        await server.releaseRead()
+        try await direct.value
+        try await refresh.value // A superseded card must not stop a host's poll loop.
+        #expect(sessions.allSatisfy { $0.resolvedContent == .html("<p>revision 2</p>") })
         #expect(assistant.projectResourceRefreshError == nil)
         #expect(!assistant.isRefreshingProjectResources)
     }

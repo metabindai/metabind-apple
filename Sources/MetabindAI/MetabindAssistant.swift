@@ -310,7 +310,9 @@ public final class MetabindAssistant {
             do {
                 try await session.reloadResource(uri: toolUIMap[session.toolName])
             } catch is CancellationError {
-                throw CancellationError()
+                // The host reloaded or tore down this card, superseding this
+                // reload. Skip the card unless the refresh itself was cancelled.
+                try Task.checkCancellation()
             } catch {
                 // One unavailable card should not prevent other cards updating.
                 if firstError == nil { firstError = error }
