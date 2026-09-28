@@ -50,6 +50,10 @@ struct ManualSessionTests {
         let session = ManualMCPAppSession(toolCall: makeToolCall(), server: TestServer())
 
         // Wait for resource fetch to complete
+        await waitUntil { !session.phase.isLoading }
+        #expect(session.phase.isActive)
+
+        // No event marks the absence of a tool call, so allow 100 ms for an unwanted one to complete
         try await Task.sleep(for: .milliseconds(100))
 
         // Should be active (resource loaded) but NOT completed (no auto-execution)
@@ -59,7 +63,7 @@ struct ManualSessionTests {
     @Test func completeTransitionsToCompleted() async throws {
         let session = ManualMCPAppSession(toolCall: makeToolCall(), server: TestServer())
 
-        try await Task.sleep(for: .milliseconds(100))
+        await waitUntil { session.phase.isActive }
 
         let result = ToolResult(text: "my custom result")
         session.complete(with: result)
@@ -74,7 +78,7 @@ struct ManualSessionTests {
     @Test func completeWithErrorTransitionsToFailed() async throws {
         let session = ManualMCPAppSession(toolCall: makeToolCall(), server: TestServer())
 
-        try await Task.sleep(for: .milliseconds(100))
+        await waitUntil { session.phase.isActive }
 
         let errorResult = ToolResult(text: "something broke", isError: true)
         session.complete(with: errorResult)
@@ -97,7 +101,7 @@ struct ManualSessionTests {
     @Test func feedThenComplete() async throws {
         let session = ManualMCPAppSession(toolCall: makeToolCall(), server: TestServer())
 
-        try await Task.sleep(for: .milliseconds(100))
+        await waitUntil { session.phase.isActive }
 
         session.feed(["step": 1])
         session.feed(["step": 2])
@@ -136,7 +140,7 @@ struct ManualSessionTests {
             if case .completed(let r) = phase { completedResult = r }
         }
 
-        try await Task.sleep(for: .milliseconds(100))
+        await waitUntil { session.phase.isActive }
         session.complete(with: ToolResult(text: "callback test"))
 
         #expect(completedResult?.content.first == .text("callback test"))
