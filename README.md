@@ -189,6 +189,7 @@ struct ContentView: View {
         headers: ["authorization": "Bearer \(token)"]
     )
 
+    @State private var tools: [MCPToolDefinition] = []
     @State private var session: MCPAppSession?
 
     var body: some View {
@@ -197,17 +198,24 @@ struct ContentView: View {
                 let call = SimpleMCPToolCall(
                     id: UUID().uuidString,
                     name: "create_promotion",
-                    arguments: .object([:])
+                    arguments: .object([:]),
+                    toolDefinition: tools.first { $0.name == "create_promotion" }
                 )
                 session = MCPAppSession(toolCall: call, server: client)
             }
+            .disabled(tools.isEmpty)
             if let session {
                 MCPAppView(session: session)
             }
         }
+        .task {
+            tools = (try? await client.listTools()) ?? []
+        }
     }
 }
 ```
+
+The session finds the tool's UI through `toolDefinition`: `listTools()` returns each tool's definition, including the `ui://` resource named in its `_meta.ui`. Without a definition, the session runs the tool but has no UI resource to fetch, so only the text of the tool result renders.
 
 ---
 
