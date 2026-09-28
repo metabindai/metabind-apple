@@ -92,6 +92,10 @@ public class MCPAppSession: Identifiable {
     /// otherwise remain registered in the current BindJS context.
     private(set) var resourceContextRevision: UInt64 = 0
     private var executionTask: Task<Void, Never>?
+    /// The initial UI fetch and the phase change that follows it. For an
+    /// auto-executing session, `executionTask` also runs the tool; a UI reload
+    /// waits only for this part.
+    private var initialResourceTask: Task<Void, Never>?
     private var resourceReloadTask: Task<ResolvedAppContent, any Error>?
     private var resourceReloadGeneration: UInt64 = 0
     private let autoExecute: Bool
@@ -336,7 +340,7 @@ public class MCPAppSession: Identifiable {
 
         do {
             // Initial resource loading must not overwrite the refreshed content.
-            await executionTask?.value
+            await initialResourceTask?.value
             try Task.checkCancellation()
             guard generation == resourceReloadGeneration else { throw CancellationError() }
             let task = Task { try await self.resolveResource(uri: uri) }
@@ -461,10 +465,10 @@ public class MCPAppSession: Identifiable {
     // MARK: - Execution
 
     private func startAutoExecution() {
-        executionTask = Task { [weak self] in
+        let loading = Task { [weak self] in
             guard let self else { return }
 
-            guard let server = self.server else {
+            guard self.server != nil else {
                 self.transitionTo(.failed(.serverUnreachable(underlying: SessionError.noServer)))
                 return
             }
@@ -487,6 +491,17 @@ public class MCPAppSession: Identifiable {
 
             // Step 2: Active
             self.transitionTo(.active)
+        }
+        initialResourceTask = loading
+
+        executionTask = Task { [weak self] in
+            guard let self else { return }
+            await withTaskCancellationHandler {
+                await loading.value
+            } onCancel: {
+                loading.cancel()
+            }
+            guard case .active = self.phase, let server = self.server else { return }
 
             // Step 3: Execute tool
             do {
@@ -530,6 +545,7 @@ public class MCPAppSession: Identifiable {
                 }
             }
         }
+        initialResourceTask = executionTask
     }
 
     enum SessionError: Error, Sendable {

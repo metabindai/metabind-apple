@@ -8,6 +8,16 @@ private actor ReloadServer: MCPServer {
     var calls = 0
     var fail = false
     var mimeType = "text/html"
+    var holdsToolCall = false
+    var heldToolCall: CheckedContinuation<Void, Never>?
+    var isToolCallHeld: Bool { heldToolCall != nil }
+
+    func holdToolCall() { holdsToolCall = true }
+    func releaseToolCall() {
+        holdsToolCall = false
+        heldToolCall?.resume()
+        heldToolCall = nil
+    }
 
     func update(_ text: String, fail: Bool = false, mimeType: String = "text/html") {
         self.text = text
@@ -17,6 +27,7 @@ private actor ReloadServer: MCPServer {
 
     func callTool(name: String, arguments: JSONValue) async throws -> ToolResult {
         calls += 1
+        if holdsToolCall { await withCheckedContinuation { heldToolCall = $0 } }
         return ToolResult(text: "original result")
     }
 
@@ -97,6 +108,29 @@ struct ResourceReloadTests {
         #expect(session.resourceUri == "ui://updated-card")
         #expect(session.resolvedContent == .html("<p>recovered</p>"))
         #expect(session.resourceReloadError == nil)
+        #expect(await server.calls == 1)
+    }
+
+    @Test func reloadDoesNotWaitForToolExecution() async throws {
+        let server = ReloadServer()
+        await server.holdToolCall()
+        let session = MCPAppSession(id: "card", toolName: "save", resourceUri: "ui://card", server: server)
+        var deadline = Date().addingTimeInterval(2)
+        while !(await server.isToolCallHeld) && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(session.phase.isActive)
+        await server.update("<p>edited</p>")
+        let reload = Task { try await session.reloadResource() }
+        deadline = Date().addingTimeInterval(2)
+        while session.resolvedContent != .html("<p>edited</p>") && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(session.resolvedContent == .html("<p>edited</p>"), "A UI reload must not wait for the tool call")
+        #expect(session.phase.isActive)
+        await server.releaseToolCall()
+        try await reload.value
+        #expect(await session.awaitResult() == ToolResult(text: "original result"))
         #expect(await server.calls == 1)
     }
 }
