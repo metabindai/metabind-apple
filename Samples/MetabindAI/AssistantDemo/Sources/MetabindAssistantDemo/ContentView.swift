@@ -3,13 +3,15 @@ import Security
 import MetabindAI
 
 struct ContentView: View {
-    @State private var metabindApiKey: String = KeychainKey.load() ?? ""
+    @State private var metabindApiKey: String = KeychainKey.initialValue()
     @State private var assistant: MetabindAssistant?
 
-    private let orgId = "IgJH0BzIn4LlfnCbcDc7"
-    private let projectId = "Q0WNzrjYuO23n6k2EjKE"
+    private let orgId = Bundle.main.object(forInfoDictionaryKey: "MetabindOrgId") as? String ?? "IgJH0BzIn4LlfnCbcDc7"
+    private let projectId = Bundle.main.object(forInfoDictionaryKey: "MetabindProjectId") as? String ?? "Q0WNzrjYuO23n6k2EjKE"
     private let agentHost = MetabindAgentProvider.productionHost
-    private let mcpServerURL = URL(string: "https://mcp.metabind.ai/IgJH0BzIn4LlfnCbcDc7/projects/Q0WNzrjYuO23n6k2EjKE")!
+    private var mcpServerURL: URL {
+        URL(string: "https://mcp.metabind.ai/\(orgId)/projects/\(projectId)")!
+    }
 
     var body: some View {
         NavigationStack {
@@ -67,6 +69,11 @@ struct ContentView: View {
 private enum KeychainKey {
     static let service = "com.example.MetabindAssistantDemo.apiKey"
     static let account = "metabind-api-key"
+
+    static func initialValue() -> String {
+        let configured = Bundle.main.object(forInfoDictionaryKey: "MetabindAPIKey") as? String ?? ""
+        return configured.isEmpty ? load() ?? "" : configured
+    }
 
     static func load() -> String? {
         var query: [String: Any] = [

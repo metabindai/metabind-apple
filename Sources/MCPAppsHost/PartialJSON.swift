@@ -22,6 +22,9 @@ import Foundation
 /// - Object **keys** are only honored once their string has closed and a `:`
 ///   follows; a key still being typed contributes nothing.
 /// - Unclosed objects and arrays are closed implicitly.
+/// - Objects/arrays nested past a fixed depth are treated like any other
+///   incomplete value and dropped, so a runaway or adversarial buffer can't
+///   grow the parser's recursion past what the stack can hold.
 public enum PartialJSON {
 
     /// Parse a (possibly incomplete) JSON document. Returns nil when nothing
@@ -34,8 +37,15 @@ public enum PartialJSON {
     }
 
     private struct Parser {
+        /// Recursion cap for nested objects/arrays. Deep enough for any real
+        /// tool-argument payload, shallow enough to leave headroom on the
+        /// smallest stack this parser runs on (streamed from an async task on
+        /// every delta) well before a call-stack overflow.
+        static let maxDepth = 64
+
         let scalars: [Unicode.Scalar]
         var i = 0
+        var depth = 0
 
         var atEnd: Bool { i >= scalars.count }
         func peek() -> Unicode.Scalar? { atEnd ? nil : scalars[i] }
@@ -70,6 +80,9 @@ public enum PartialJSON {
         // MARK: Object / Array
 
         mutating func parseObject() -> JSONValue? {
+            guard depth < Self.maxDepth else { return nil }
+            depth += 1
+            defer { depth -= 1 }
             i += 1 // consume '{'
             var dict: [String: JSONValue] = [:]
             while true {
@@ -92,6 +105,9 @@ public enum PartialJSON {
         }
 
         mutating func parseArray() -> JSONValue? {
+            guard depth < Self.maxDepth else { return nil }
+            depth += 1
+            defer { depth -= 1 }
             i += 1 // consume '['
             var arr: [JSONValue] = []
             while true {

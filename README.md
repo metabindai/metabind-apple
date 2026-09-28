@@ -1,10 +1,12 @@
-# Metabind for Apple
+# Metabind for Apple: MCP Apps host and Assistant SDK for SwiftUI
 
-The native Apple SDK for Metabind. Embed a governed agent in your iOS, macOS, or visionOS app, and render Metabind-managed content as native SwiftUI.
+`MCPAppsHost` is an MCP Apps host for SwiftUI apps on iOS and macOS: it renders MCP App UIs written in BindJS as native SwiftUI views, with no WebView. `MetabindAI`, the Assistant SDK, is built on it and puts a governed agent inside your own app, using the same MCP App you publish to Claude, ChatGPT, and every MCP host.
+
+**What it renders.** BindJS resources (`application/vnd.bindjs+json`) are drawn by the Apache 2.0 [BindJS SwiftUI renderer](https://github.com/metabindai/bindjs-apple), with component logic running in JavaScriptCore.
 
 ## What this is
 
-Metabind is the hosted platform for [Model Context Protocol (MCP)](https://modelcontextprotocol.io) Apps: you define the tools, and Metabind runs the server. It turns your existing UI and APIs into a governed agent — a standards-compliant MCP App that understands what each customer came for, renders interactive UI instead of plain text, and runs both inside your own app and across Claude, ChatGPT, and every MCP host. The agent is governed, not autonomous. It follows the system prompt you author, and it can only render components you approved, validated against each tool's schema on every render.
+Metabind builds agents that answer in your product's own UI, not in a chat window: interactive interfaces that take customers straight to what they came for, in the brand they already know. It's built from the UI, design system, and APIs the app already has. No rewrite. It's governed, rendering only components you've approved, enforced on every render. And it's hosted: you define the tools, we run the server. The same agent runs inside your own iOS, Android, and web apps, and across Claude, ChatGPT, and every MCP host, on the open [MCP](https://modelcontextprotocol.io) standard.
 
 This package is the Apple side. It ships three libraries you can adopt independently:
 
@@ -14,10 +16,10 @@ This package is the Apple side. It ships three libraries you can adopt independe
 | `MCPAppsHost` | Render a single MCP tool result without the conversational layer. The low-level building blocks (`MCPAppsClient`, `MCPAppSession`, `MCPAppView`) that `MetabindAI` is built on. |
 | `MetabindContent` | Fetch and render content from Metabind's content platform. A SwiftUI view, an async/await GraphQL client, SQLite-backed caching, and real-time updates over WebSocket. |
 
-Everything renders through BindJS as real native SwiftUI, not web views. The three libraries have different dependency footprints, so you import only the ones you use: a content-only app doesn't link the assistant, and an assistant-only app doesn't link the GraphQL client.
+Everything written in BindJS renders as native SwiftUI, not in a web view. The three libraries have different dependency footprints, so you import only the ones you use: a content-only app doesn't link the assistant, and an assistant-only app doesn't link the GraphQL client.
 
 > [!NOTE]
-> BindJS is Metabind's rendering engine. This SDK depends on it as a source package — [`metabindai/bindjs-apple`](https://github.com/metabindai/bindjs-apple), Apache 2.0 — so the code rendering your UI is open, auditable, and steppable in the debugger. All of BindJS is open source: the runtime and React renderer, and the native SwiftUI and Jetpack Compose engines.
+> BindJS is the open component language for agent UI, rendered natively as SwiftUI, Jetpack Compose, and React; the SwiftUI rendering engine is its Apple half. This SDK depends on it as a source package — [`metabindai/bindjs-apple`](https://github.com/metabindai/bindjs-apple), Apache 2.0 — so the code rendering your UI is open, auditable, and steppable in the debugger. All of BindJS is open source: the runtime and React renderer, and the native SwiftUI and Jetpack Compose engines.
 
 ## The Metabind SDKs
 
@@ -27,9 +29,9 @@ Everything renders through BindJS as real native SwiftUI, not web views. The thr
 | Android | [`metabind-android`](https://github.com/metabindai/metabind-android) |
 | Web (React) | [`metabind-web`](https://github.com/metabindai/metabind-web) |
 
-One MCP App serves all three: the same tools, components, and agent configuration from a single publish, so the SDKs compose — ship the iOS assistant, the Android assistant, and the web chat surface together.
+One [MCP App](https://github.com/modelcontextprotocol/ext-apps) serves all three: the same tools, components, and agent configuration from a single publish, so the SDKs compose — ship the iOS assistant, the Android assistant, and the web chat surface together.
 
-**[🚀 Start free at metabind.ai](https://metabind.ai)** · **[📖 Read the docs](https://docs.metabind.ai)**
+**[Start free at metabind.ai](https://www.metabind.ai/signup)** · **[Read the docs](https://docs.metabind.ai)**
 
 ## Documentation
 
@@ -75,7 +77,7 @@ In Xcode, choose File > Add Package Dependencies, enter the repository URL, and 
 
 `MetabindAI` is the Assistant SDK. It embeds your Metabind agent inside your own app, calling real tools and rendering interactive UI as native SwiftUI, governed by the same MCP App you publish to Claude, ChatGPT, and every other MCP host. One MCP App definition powers two surfaces: a hosted MCP server that every MCP host can discover, and a drop-in governed agent inside your own app. This library handles the second.
 
-When a tool returns a `ui` resource, the SDK fetches the BindJS bundle and renders it as native SwiftUI, the same interface a person sees in Claude or ChatGPT, running natively inside your app. Format negotiation is automatic: on the MCP `initialize` handshake, the client advertises the MIME types its registered `ContentResolver`s support (`application/vnd.bindjs+json` for native rendering, `text/html;profile=mcp-app` as a fallback) through the `io.modelcontextprotocol/ui` capability extension. The server picks the right bundle format for each call, so you never set `Accept` headers yourself.
+When a tool returns a `ui` resource, the SDK fetches the BindJS bundle and renders it as native SwiftUI, the same interface a person sees in Claude or ChatGPT, running natively inside your app. Protocol and format negotiation are automatic: the client advertises the MIME types its registered `ContentResolver`s support (`application/vnd.bindjs+json` for native rendering, `text/html;profile=mcp-app` as a fallback) through the `io.modelcontextprotocol/ui` capability extension of the [MCP Apps specification](https://github.com/modelcontextprotocol/ext-apps). With MCP 2026-07-28 servers, the client uses stateless requests and includes those MIME types with every request. With older servers, it falls back to the `initialize` handshake and session transport. The server picks the right bundle format for each call, so you never set `Accept` headers yourself.
 
 ### Quick start: agent proxy
 
@@ -102,7 +104,7 @@ struct ContentView: View {
 }
 ```
 
-One Metabind API key authenticates both the MCP server and the agent proxy. Create one in MCP App Studio, or with `metabind api-key create`. In production, have your backend authenticate the user and mint the project token, rather than embedding a static token in the app.
+One Metabind API key authenticates both the MCP server and the agent proxy. Create one in Metabind Studio, or with `metabind api-key create`. In production, have your backend authenticate the user and mint the project token, rather than embedding a static token in the app.
 
 ### Quick start: Anthropic (BYOK)
 
@@ -217,6 +219,7 @@ struct ContentView: View {
         headers: ["authorization": "Bearer \(token)"]
     )
 
+    @State private var tools: [MCPToolDefinition] = []
     @State private var session: MCPAppSession?
 
     var body: some View {
@@ -225,17 +228,24 @@ struct ContentView: View {
                 let call = SimpleMCPToolCall(
                     id: UUID().uuidString,
                     name: "create_promotion",
-                    arguments: .object([:])
+                    arguments: .object([:]),
+                    toolDefinition: tools.first { $0.name == "create_promotion" }
                 )
                 session = MCPAppSession(toolCall: call, server: client)
             }
+            .disabled(tools.isEmpty)
             if let session {
                 MCPAppView(session: session)
             }
         }
+        .task {
+            tools = (try? await client.listTools()) ?? []
+        }
     }
 }
 ```
+
+The session finds the tool's UI through `toolDefinition`: `listTools()` returns each tool's definition, including the `ui://` resource named in its `_meta.ui`. Without a definition, the session runs the tool but has no UI resource to fetch, so only the text of the tool result renders.
 
 ---
 
@@ -594,17 +604,12 @@ do {
 
 ## Samples
 
-Four sample apps live in [`Samples/`](Samples). Each references this package locally, so you can open one, build it, and see the SDK working against the current source.
-
-| Sample | Shows |
-|---|---|
-| [Retail](Samples/MetabindContent/Retail) | A minimal `MetabindContent` integration: initialize the client, render content, and route between pages. |
-| [Spotlight](Samples/MetabindContent/Spotlight) | A richer `MetabindContent` integration: multiple content blocks, real-time updates, push notifications, and deep links. Includes a full account-setup guide. |
-| [AssistantDemo](Samples/MetabindAI/AssistantDemo) | A `MetabindAI` chat app whose tool returns render as live, native SwiftUI. About 20 lines of integration code. |
-| [FinanceDemo](Samples/MetabindAI/FinanceDemo) | A configurable `MetabindAI` reference app for a customer-owned Finance MCP project. It routes rendered answers to custom surfaces instead of a transcript and uses synthetic sample financial data. |
+[AssistantDemo](Samples/MetabindAI/AssistantDemo) is a `MetabindAI` chat app whose tool returns render as live, native SwiftUI — about 20 lines of integration code. It references this package locally, so you can open it, build it, and see the SDK working against the current source. The `MetabindContent` samples live beside the code they exercise; see [`Sources/MetabindContent/Samples/`](Sources/MetabindContent/Samples).
 
 > [!NOTE]
 > To use a sample outside this repository, change its package reference from the local path to the published package URL, `https://github.com/metabindai/metabind-apple`.
+
+Samples exist to exercise and debug the SDK. Product-style demo apps built on tagged SDK releases live in [`metabind-demos`](https://github.com/metabindai/metabind-demos).
 
 ## Logging
 
@@ -641,7 +646,7 @@ Generated code is written to `Sources/MetabindContent/generated/`. Never edit th
 
 ## Dependencies
 
-- Apollo iOS 1.23.0, the GraphQL client, with WebSocket and SQLite support. Used by `MetabindContent`.
+- Apollo iOS 1.25.7, the GraphQL client, with WebSocket and SQLite support. Used by `MetabindContent`.
 - BindJS, the native rendering engine, consumed as a source package from [`metabindai/bindjs-apple`](https://github.com/metabindai/bindjs-apple). Used by all three libraries.
 
 ## License

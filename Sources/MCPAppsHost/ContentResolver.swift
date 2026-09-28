@@ -3,7 +3,7 @@ import BindJS
 
 /// Turns a fetched ui:// resource into renderable content.
 public protocol ContentResolver: Sendable {
-    /// MIME types this resolver can handle, advertised to the server during initialization.
+    /// MIME types this resolver can handle, advertised to the server during protocol negotiation.
     var supportedMimeTypes: [String] { get }
     func canResolve(mimeType: String) -> Bool
     func resolve(_ resource: ResourceContent) async throws -> ResolvedAppContent

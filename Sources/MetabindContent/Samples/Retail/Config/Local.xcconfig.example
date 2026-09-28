@@ -1,0 +1,6 @@
+// Copy to Local.xcconfig in this directory and fill in your project values.
+// Local.xcconfig is ignored by Git. Do not put real credentials in this example.
+RETAIL_SAMPLE_API_KEY = YOUR_API_KEY
+RETAIL_SAMPLE_ORG_ID = YOUR_ORG_ID
+RETAIL_SAMPLE_PROJECT_ID = YOUR_PROJECT_ID
+RETAIL_SAMPLE_CONTENT_ID = YOUR_ROOT_CONTENT_ID

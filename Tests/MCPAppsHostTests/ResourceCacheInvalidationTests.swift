@@ -8,6 +8,7 @@ private final class HeldResourceProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) private static var pending: [HeldResourceProtocol] = []
     nonisolated(unsafe) private static var reads = 0
     private var stopped = false
+    private var requestID: Any = NSNull()
 
     static func reset() {
         lock.lock(); defer { lock.unlock() }
@@ -41,6 +42,7 @@ private final class HeldResourceProtocol: URLProtocol, @unchecked Sendable {
             }
         }
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        requestID = json?["id"] ?? NSNull()
         switch json?["method"] as? String {
         case "resources/read":
             Self.lock.lock()
@@ -58,7 +60,7 @@ private final class HeldResourceProtocol: URLProtocol, @unchecked Sendable {
     private func respond(_ result: [String: Any]) {
         let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
                                        headerFields: ["Content-Type": "application/json"])!
-        let data = try! JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "result": result])
+        let data = try! JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": requestID, "result": result])
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)

@@ -26,7 +26,7 @@ swift test                               # Run MCPAppsHostTests and MetabindAITe
 swift test --filter MCPAppsHostTests     # Run one suite
 ```
 
-`MetabindContent` has no test target. Validate changes there with `swift build` and by running the `Samples/MetabindContent` apps.
+`MetabindContent` has no test target. Validate changes there with `swift build` and by running the sample apps in `Sources/MetabindContent/Samples/`.
 
 ## GraphQL codegen (MetabindContent)
 
@@ -39,26 +39,25 @@ apollo-ios-cli generate
 
 - Generated code lands in `Sources/MetabindContent/generated/` and is checked in. **Never edit files in `generated/` by hand.**
 - The `GraphQL/` directory is excluded from the target build (`exclude: ["GraphQL"]` in `Package.swift`); only the generated code compiles. Don't "fix" the exclusion.
-- `apollo-ios-cli` is not checked into this repository. Use a CLI build that matches the pinned Apollo iOS version (exactly 1.23.0 in `Package.swift`).
+- `apollo-ios-cli` is not checked into this repository. Use a CLI build that matches the Apollo iOS version pinned in `Package.swift`.
 
 ## Dependencies
 
-- **Apollo iOS** — pinned `exact: "1.23.0"`. Version bumps require regenerating GraphQL code with a matching CLI.
+- **Apollo iOS** — pinned with `exact:` in `Package.swift`. Version bumps require regenerating GraphQL code with a matching CLI. Staying on the 1.x line is deliberate (decided 2026-08-07): Apollo 2.x removes the `ApolloInterceptor` / `RequestChain` API that `AuthenticationInterceptor.swift` is built on, and changes the `ApolloClient` transport and `CachePolicy` surface that `MetabindClient.swift` uses. That migration is separate work, not a version bump.
 - **BindJS** — the rendering engine, consumed as the **source package** [`metabindai/bindjs-apple`](https://github.com/metabindai/bindjs-apple) (`from: "1.1.6"`, Apache 2.0). To pick up a new BindJS release, tag `bindjs-apple`, then bump the version in `Package.swift` and let SwiftPM update `Package.resolved`. Do not switch back to `bindjs-apple-binary` — the open-source SDK deliberately depends on open source.
 - **SVGView** and **GLTFKit2** appear in `Package.resolved` as transitive dependencies of BindJS (SVG and 3D model support; GLTFKit2 resolves as a prebuilt artifact). Don't declare either directly.
 
 ## Samples
 
-Four Xcode projects under `Samples/`, grouped by the product they demonstrate:
+Three sample Xcode projects, grouped by the product they demonstrate. The `MetabindContent` samples sit inside the target's source folder and are kept out of the build by the target's `exclude` list in `Package.swift` — extend that list if you add folders there:
 
 | Sample | Shows |
 |---|---|
-| `Samples/MetabindContent/Retail` | Minimal `MetabindContent` integration: client setup, content rendering, page navigation |
-| `Samples/MetabindContent/Spotlight` | Richer `MetabindContent` integration: multiple content blocks, real-time updates, push notifications, deep links |
+| `Sources/MetabindContent/Samples/Retail` | Minimal `MetabindContent` integration: client setup, content rendering, page navigation |
+| `Sources/MetabindContent/Samples/Spotlight` | Richer `MetabindContent` integration: multiple content blocks, real-time updates, push notifications, deep links |
 | `Samples/MetabindAI/AssistantDemo` | `MetabindAI` chat app (macOS) whose tool returns render as live SwiftUI, via the agent proxy |
-| `Samples/MetabindAI/FinanceDemo` | `MetabindAI` finance app (iOS) with custom answer surfaces instead of a chat transcript, driven by `AnswerRouter` |
 
-Each project references this package by local path (`XCLocalSwiftPackageReference` pointing at `../../..`), so building a sample compiles the SDK from your current checkout — the fastest way to see a source change running in a real app. Open the sample's `.xcodeproj`; each sample has its own README with account and credential setup.
+Samples exist to exercise and debug the SDK; product demos built on tagged releases live in `metabindai/metabind-demos`, not here. Each project references this package by local path (`XCLocalSwiftPackageReference` pointing at the repo root), so building a sample compiles the SDK from your current checkout — the fastest way to see a source change running in a real app. Open the sample's `.xcodeproj`; each sample has its own README with account and credential setup.
 
 ## Conventions
 

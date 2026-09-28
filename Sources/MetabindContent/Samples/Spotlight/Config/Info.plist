@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>MetabindAPIKey</key>
+    <string>$(SPOTLIGHT_SAMPLE_API_KEY)</string>
+    <key>MetabindOrgId</key>
+    <string>$(SPOTLIGHT_SAMPLE_ORG_ID)</string>
+    <key>MetabindProjectId</key>
+    <string>$(SPOTLIGHT_SAMPLE_PROJECT_ID)</string>
+    <key>MetabindHeroContentId</key>
+    <string>$(SPOTLIGHT_SAMPLE_HERO_CONTENT_ID)</string>
+    <key>MetabindInfoContentId</key>
+    <string>$(SPOTLIGHT_SAMPLE_INFO_CONTENT_ID)</string>
+    <key>MetabindPromotionContentId</key>
+    <string>$(SPOTLIGHT_SAMPLE_PROMOTION_CONTENT_ID)</string>
+</dict>
+</plist>

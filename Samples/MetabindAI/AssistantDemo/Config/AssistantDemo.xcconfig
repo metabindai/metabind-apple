@@ -1,0 +1,6 @@
+// Public defaults. Keep private credentials in the ignored Local.xcconfig.
+ASSISTANT_DEMO_ORG_ID = IgJH0BzIn4LlfnCbcDc7
+ASSISTANT_DEMO_PROJECT_ID = Q0WNzrjYuO23n6k2EjKE
+ASSISTANT_DEMO_API_KEY =
+
+#include? "Local.xcconfig"

@@ -38,6 +38,9 @@ public class PackagesQuery: GraphQLQuery {
         "limit": .variable("limit")
       ]),
     ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      PackagesQuery.Data.self
+    ] }
 
     public var packages: Packages { __data["packages"] }
 
@@ -54,6 +57,9 @@ public class PackagesQuery: GraphQLQuery {
         .field("data", [Datum].self),
         .field("pagination", Pagination.self),
       ] }
+      public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        PackagesQuery.Data.Packages.self
+      ] }
 
       public var data: [Datum] { __data["data"] }
       public var pagination: Pagination { __data["pagination"] }
@@ -69,6 +75,10 @@ public class PackagesQuery: GraphQLQuery {
         public static var __selections: [ApolloAPI.Selection] { [
           .field("__typename", String.self),
           .fragment(PackageFields.self),
+        ] }
+        public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+          PackagesQuery.Data.Packages.Datum.self,
+          PackageFields.self
         ] }
 
         public var id: MetabindContent.ID { __data["id"] }
@@ -108,6 +118,9 @@ public class PackagesQuery: GraphQLQuery {
           .field("cursor", String?.self),
           .field("hasMore", Bool.self),
           .field("limit", Int.self),
+        ] }
+        public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+          PackagesQuery.Data.Packages.Pagination.self
         ] }
 
         public var cursor: String? { __data["cursor"] }

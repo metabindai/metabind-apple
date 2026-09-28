@@ -27,6 +27,9 @@ public class ComponentQuery: GraphQLQuery {
     public static var __selections: [ApolloAPI.Selection] { [
       .field("component", Component?.self, arguments: ["id": .variable("id")]),
     ] }
+    public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+      ComponentQuery.Data.self
+    ] }
 
     public var component: Component? { __data["component"] }
 
@@ -41,6 +44,10 @@ public class ComponentQuery: GraphQLQuery {
       public static var __selections: [ApolloAPI.Selection] { [
         .field("__typename", String.self),
         .fragment(ComponentFields.self),
+      ] }
+      public static var __fulfilledFragments: [any ApolloAPI.SelectionSet.Type] { [
+        ComponentQuery.Data.Component.self,
+        ComponentFields.self
       ] }
 
       public var id: MetabindContent.ID { __data["id"] }
