@@ -219,8 +219,14 @@ public actor MCPAppsClient: MCPServer {
         try validateResultType(in: result, method: "tools/call")
 
         let isError = result["isError"] as? Bool ?? false
-        guard let contentArray = result["content"] as? [[String: Any]] else {
+        let contentArray: [[String: Any]]
+        if let content = result["content"] as? [[String: Any]] {
+            contentArray = content
+        } else if protocolEra == .modern {
             throw MCPClientError.invalidResponse("Missing content in tools/call response")
+        } else {
+            // Some legacy servers omit content; treat it as empty, as before.
+            contentArray = []
         }
         let contentData = try JSONSerialization.data(withJSONObject: contentArray)
         let blocks: [ContentBlock]

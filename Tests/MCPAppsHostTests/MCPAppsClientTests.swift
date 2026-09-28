@@ -1738,6 +1738,26 @@ struct MCPAppsClientTests {
             #expect(result.isError == true)
         }
 
+        @Test func callToolToleratesLegacyResultWithoutContent() async throws {
+            registerInitHandlers()
+            MockURLProtocol.handlers["tools/call"] = { _ in
+                let result: [String: Any] = [
+                    "structuredContent": ["ok": true],
+                    "isError": false
+                ]
+                let body: [String: Any] = ["jsonrpc": "2.0", "id": 3, "result": result]
+                return (200, [:], try! JSONSerialization.data(withJSONObject: body))
+            }
+
+            let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+            let result = try await client.callTool(name: "structured_only", arguments: .object([:]))
+
+            // A 2026-07-28 result without content is still rejected
+            // (rejectsMalformedModernToolResults).
+            #expect(result.isError == false)
+            #expect(result.content == [.text("")])
+        }
+
         @Test func readResourceCachesResult() async throws {
             registerInitHandlers()
             var fetchCount = 0
