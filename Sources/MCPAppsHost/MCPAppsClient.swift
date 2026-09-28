@@ -640,6 +640,10 @@ public actor MCPAppsClient: MCPServer {
         var delay = configuration.retryBaseDelay
 
         for attempt in 0...configuration.maxRetries {
+            // Captured before sending: a concurrent request may reset the
+            // connection while this one is in flight.
+            let requestEra = protocolEra ?? .legacy
+            let requestSession = sessionId
             do {
                 let (json, _) = try await sendRequestRaw(
                     method: method,
@@ -648,10 +652,14 @@ public actor MCPAppsClient: MCPServer {
                 )
                 return json
             } catch MCPClientError.serverError(let status, _)
-                where protocolEra == .legacy && (status == 404 || status == 410) {
+                where requestEra == .legacy && (status == 404 || status == 410) {
                 // Session expired — re-initialize and retry once (no backoff).
+                // Only the first request to see this session fail resets it;
+                // later ones wait for that reconnection instead of discarding it.
                 log.info("Session expired (HTTP \(status)), re-initializing...")
-                resetConnection()
+                if sessionId == requestSession {
+                    resetConnection()
+                }
                 try await ensureConnected()
                 let (json, _) = try await sendRequestRaw(
                     method: method,

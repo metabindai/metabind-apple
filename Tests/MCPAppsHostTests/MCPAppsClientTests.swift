@@ -1826,6 +1826,55 @@ struct MCPAppsClientTests {
             #expect(tools.isEmpty)
             #expect(initCount == 2) // Original init + re-init after 404
         }
+
+        @Test func concurrentRequestsShareOneReconnectionAfterSessionExpiry() async throws {
+            var initCount = 0
+            MockURLProtocol.handlers["initialize"] = { req in
+                initCount += 1
+                let body: [String: Any] = [
+                    "jsonrpc": "2.0", "id": req.json?["id"] ?? 1,
+                    "result": [
+                        "protocolVersion": "2025-03-26",
+                        "capabilities": [:],
+                        "serverInfo": ["name": "mock", "version": "1.0"]
+                    ]
+                ]
+                return (200, ["Mcp-Session-Id": "session-\(initCount)"], try! JSONSerialization.data(withJSONObject: body))
+            }
+            MockURLProtocol.handlers["notifications/initialized"] = { _ in (202, [:], Data()) }
+            MockURLProtocol.handlers["tools/list"] = { req in
+                let body: [String: Any] = ["jsonrpc": "2.0", "id": req.json?["id"] ?? 2, "result": ["tools": []]]
+                return (200, [:], try! JSONSerialization.data(withJSONObject: body))
+            }
+            MockURLProtocol.handlers["resources/read"] = { req in
+                // The server has expired the first session.
+                if req.urlRequest.value(forHTTPHeaderField: "Mcp-Session-Id") == "session-1" {
+                    return (404, [:], Data("Session not found".utf8))
+                }
+                let uri = (req.json?["params"] as? [String: Any])?["uri"] as? String ?? "?"
+                let result: [String: Any] = [
+                    "contents": [["uri": uri, "mimeType": "text/plain", "text": "ok \(uri)"]]
+                ]
+                let body: [String: Any] = ["jsonrpc": "2.0", "id": req.json?["id"] ?? 3, "result": result]
+                return (200, [:], try! JSONSerialization.data(withJSONObject: body))
+            }
+
+            let client = MCPAppsClient(
+                url: mockURL,
+                configuration: .init(maxRetries: 0, urlSession: mockSession())
+            )
+            _ = try await client.listTools()
+
+            // Both reads carry the expired session. The second 404 arrives while
+            // the first is still reconnecting, and must wait for that reconnection.
+            async let first = client.readResource(uri: "ui://test/a")
+            async let second = client.readResource(uri: "ui://test/b")
+            let (a, b) = try await (first, second)
+
+            #expect(a.text == "ok ui://test/a")
+            #expect(b.text == "ok ui://test/b")
+            #expect(initCount == 2) // One reconnection, shared by both reads
+        }
     }
 
     // MARK: - JSON-RPC Error Handling
