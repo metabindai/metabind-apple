@@ -25,6 +25,9 @@ public class MCPAppSession: Identifiable {
     nonisolated public let toolName: String
     public let toolArguments: JSONValue
     public let resourceUri: String?
+    /// The tool's definition, when the call carried one. An HTML view receives
+    /// it as `hostContext.toolInfo`.
+    let toolDefinition: MCPToolDefinition?
 
     // MARK: - Observable State
 
@@ -84,6 +87,8 @@ public class MCPAppSession: Identifiable {
 
     private(set) var server: (any MCPServer)?
     private(set) var resolvedContent: ResolvedAppContent?
+    /// `_meta` of the fetched UI resource. An HTML view builds its CSP from it.
+    private(set) var resourceMeta: JSONValue?
     private var executionTask: Task<Void, Never>?
     private let autoExecute: Bool
     /// Whether a server has been connected (used by MCPAppView to avoid re-connecting).
@@ -97,7 +102,7 @@ public class MCPAppSession: Identifiable {
 
     /// Standard: fetches the UI resource and executes the tool automatically.
     public init(toolCall: some MCPToolCall, server: some MCPServer, resolvers: [any ContentResolver] = defaultResolvers) {
-        (self.id, self.toolName, self.toolArguments, self.resourceUri) = Self.extractFields(from: toolCall)
+        (self.id, self.toolName, self.toolArguments, self.resourceUri, self.toolDefinition) = Self.extractFields(from: toolCall)
         self.server = server
         self.resolvers = resolvers
         self.autoExecute = true
@@ -113,7 +118,7 @@ public class MCPAppSession: Identifiable {
     /// If a UI resource URI is available and a server is provided, the resource
     /// is fetched so the native UI can render alongside the completed result.
     public init(toolCall: some MCPToolCall, completedWith result: ToolResult, server: (any MCPServer)? = nil, resolvers: [any ContentResolver] = defaultResolvers) {
-        (self.id, self.toolName, self.toolArguments, self.resourceUri) = Self.extractFields(from: toolCall)
+        (self.id, self.toolName, self.toolArguments, self.resourceUri, self.toolDefinition) = Self.extractFields(from: toolCall)
         self.server = server
         self.resolvers = resolvers
         self.autoExecute = false
@@ -132,7 +137,7 @@ public class MCPAppSession: Identifiable {
 
     /// Pending: stores tool call info but waits for a server connection.
     public init(pendingToolCall: some MCPToolCall, resolvers: [any ContentResolver] = defaultResolvers) {
-        (self.id, self.toolName, self.toolArguments, self.resourceUri) = Self.extractFields(from: pendingToolCall)
+        (self.id, self.toolName, self.toolArguments, self.resourceUri, self.toolDefinition) = Self.extractFields(from: pendingToolCall)
         self.server = nil
         self.resolvers = resolvers
         self.autoExecute = true
@@ -142,7 +147,7 @@ public class MCPAppSession: Identifiable {
 
     /// Internal init for ManualMCPAppSession.
     init(toolCall: some MCPToolCall, server: some MCPServer, resolvers: [any ContentResolver] = defaultResolvers, autoExecute: Bool) {
-        (self.id, self.toolName, self.toolArguments, self.resourceUri) = Self.extractFields(from: toolCall)
+        (self.id, self.toolName, self.toolArguments, self.resourceUri, self.toolDefinition) = Self.extractFields(from: toolCall)
         self.server = server
         self.resolvers = resolvers
         self.autoExecute = autoExecute
@@ -215,6 +220,7 @@ public class MCPAppSession: Identifiable {
         self.toolName = "example_tool"
         self.toolArguments = .object([:])
         self.resourceUri = nil
+        self.toolDefinition = nil
         self.server = nil
         self.resolvers = []
         self.autoExecute = false
@@ -234,8 +240,8 @@ public class MCPAppSession: Identifiable {
 
     // MARK: - Field Extraction
 
-    private static func extractFields(from toolCall: some MCPToolCall) -> (String, String, JSONValue, String?) {
-        (toolCall.id, toolCall.name, toolCall.arguments, toolCall.toolDefinition?.ui?.resourceUri)
+    private static func extractFields(from toolCall: some MCPToolCall) -> (String, String, JSONValue, String?, MCPToolDefinition?) {
+        (toolCall.id, toolCall.name, toolCall.arguments, toolCall.toolDefinition?.ui?.resourceUri, toolCall.toolDefinition)
     }
 
     // MARK: - Phase Transition
@@ -381,7 +387,9 @@ public class MCPAppSession: Identifiable {
             throw MCPAppError.unsupportedContentType(mimeType: resource.mimeType)
         }
         log.info("[\(self.toolName, privacy: .public)] Resolving with \(String(describing: type(of: resolver)), privacy: .public)")
-        resolvedContent = try await resolver.resolve(resource)
+        let resolved = try await resolver.resolve(resource)
+        resourceMeta = resource.meta
+        resolvedContent = resolved
         try Task.checkCancellation()
     }
 

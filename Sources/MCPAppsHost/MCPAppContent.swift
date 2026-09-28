@@ -1,6 +1,5 @@
 import SwiftUI
 import BindJS
-import WebKit
 import os
 
 private let log = Logger(subsystem: "MCPAppsHost", category: "MCPAppContent")
@@ -48,7 +47,7 @@ public struct MCPAppContent: View {
                 BindJSView(content: content, arguments: args)
                     .bindJS(bindJSConfiguration)
             case .html(let html):
-                HTMLAppView(html: html)
+                HTMLAppView(html: html, session: session, toolResult: toolResult)
             }
         } else if let toolResult {
             fallbackContent(toolResult)
@@ -194,120 +193,5 @@ import AppKit
 private func platformImage(from data: Data) -> NSImage? { NSImage(data: data) }
 extension Image {
     init(platformImage: NSImage) { self.init(nsImage: platformImage) }
-}
-#endif
-
-// MARK: - HTML App View (WKWebView)
-
-/// Sandboxed WKWebView for rendering MCP App HTML content.
-///
-/// Security measures:
-/// - CSP meta tag injected to restrict script/style/connect sources
-/// - JavaScript limited to inline only (required for MCP Apps)
-/// - Navigation delegate blocks all external navigation
-/// - No access to local storage, cookies, or device APIs beyond what CSP allows
-
-private func sandboxedWebViewConfiguration() -> WKWebViewConfiguration {
-    let config = WKWebViewConfiguration()
-    config.defaultWebpagePreferences.allowsContentJavaScript = true
-    config.preferences.isElementFullscreenEnabled = false
-    // Prevent access to local storage across MCP apps
-    config.websiteDataStore = .nonPersistent()
-    return config
-}
-
-/// Injects a restrictive CSP meta tag into the HTML head.
-/// Allows inline scripts/styles (needed for MCP Apps) but blocks external resources
-/// except images and media which are commonly needed for tool UIs.
-func injectCSP(_ html: String) -> String {
-    let csp = """
-    <meta http-equiv="Content-Security-Policy" content="\
-    default-src 'none'; \
-    script-src 'unsafe-inline'; \
-    style-src 'unsafe-inline'; \
-    img-src https: data:; \
-    media-src https: data:; \
-    font-src https: data:; \
-    connect-src 'none'; \
-    form-action 'none'; \
-    base-uri 'none';">
-    """
-
-    // Insert CSP as the first element in <head>, or before <html> if no head tag
-    if let headRange = html.range(of: "<head>", options: .caseInsensitive) {
-        var modified = html
-        modified.insert(contentsOf: csp, at: headRange.upperBound)
-        return modified
-    } else if let htmlRange = html.range(of: "<html", options: .caseInsensitive) {
-        // Find the end of the <html ...> tag
-        if let closeRange = html[htmlRange.upperBound...].range(of: ">") {
-            var modified = html
-            modified.insert(contentsOf: "<head>\(csp)</head>", at: closeRange.upperBound)
-            return modified
-        }
-    }
-    return csp + html
-}
-
-/// Navigation delegate that blocks all navigation away from the initial HTML content.
-final class HTMLNavigationDelegate: NSObject, WKNavigationDelegate {
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
-        switch navigationAction.navigationType {
-        case .other:
-            // Allow initial load and programmatic navigation within the page
-            return .allow
-        default:
-            // Block link clicks, form submissions, back/forward, reload
-            return .cancel
-        }
-    }
-}
-
-#if canImport(UIKit)
-struct HTMLAppView: UIViewRepresentable {
-    let html: String
-
-    func makeUIView(context: Context) -> WKWebView {
-        let webView = WKWebView(frame: .zero, configuration: sandboxedWebViewConfiguration())
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.scrollView.isScrollEnabled = false
-        webView.navigationDelegate = context.coordinator.navigationDelegate
-        return webView
-    }
-
-    func updateUIView(_ webView: WKWebView, context: Context) {
-        guard context.coordinator.lastHTML != html else { return }
-        context.coordinator.lastHTML = html
-        webView.loadHTMLString(injectCSP(html), baseURL: nil)
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-    class Coordinator {
-        var lastHTML: String?
-        let navigationDelegate = HTMLNavigationDelegate()
-    }
-}
-#elseif canImport(AppKit)
-struct HTMLAppView: NSViewRepresentable {
-    let html: String
-
-    func makeNSView(context: Context) -> WKWebView {
-        let webView = WKWebView(frame: .zero, configuration: sandboxedWebViewConfiguration())
-        webView.navigationDelegate = context.coordinator.navigationDelegate
-        return webView
-    }
-
-    func updateNSView(_ webView: WKWebView, context: Context) {
-        guard context.coordinator.lastHTML != html else { return }
-        context.coordinator.lastHTML = html
-        webView.loadHTMLString(injectCSP(html), baseURL: nil)
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-    class Coordinator {
-        var lastHTML: String?
-        let navigationDelegate = HTMLNavigationDelegate()
-    }
 }
 #endif

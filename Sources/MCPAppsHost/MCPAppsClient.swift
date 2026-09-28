@@ -150,7 +150,12 @@ public actor MCPAppsClient: MCPServer {
         let contentData = try JSONSerialization.data(withJSONObject: contentArray)
         let blocks = (try? JSONDecoder().decode([ContentBlock].self, from: contentData)) ?? []
 
-        let toolResult = ToolResult(content: blocks.isEmpty ? [.text("")] : blocks, isError: isError)
+        let toolResult = ToolResult(
+            content: blocks.isEmpty ? [.text("")] : blocks,
+            isError: isError,
+            structuredContent: result["structuredContent"].map { JSONValue.from($0) },
+            meta: result["_meta"].map { JSONValue.from($0) }
+        )
         log.info("tools/call ← \(name): \(blocks.count) block(s), isError=\(isError)")
         return toolResult
     }
@@ -211,7 +216,8 @@ public actor MCPAppsClient: MCPServer {
             uri: first["uri"] as? String ?? uri,
             mimeType: mimeType,
             text: first["text"] as? String,
-            blob: (first["blob"] as? String).flatMap { Data(base64Encoded: $0) }
+            blob: (first["blob"] as? String).flatMap { Data(base64Encoded: $0) },
+            meta: first["_meta"].map { JSONValue.from($0) }
         )
 
         resourceCache.set(uri, resource)
