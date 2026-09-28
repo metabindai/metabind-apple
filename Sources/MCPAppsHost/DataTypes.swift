@@ -6,16 +6,32 @@ import Foundation
 public struct ToolResult: Sendable, Codable, Hashable {
     public let content: [ContentBlock]
     public let isError: Bool
+    /// The result's `structuredContent`: data for a UI to render, kept out of
+    /// the model's context.
+    public let structuredContent: JSONValue?
+    /// The result's `_meta`.
+    public let meta: JSONValue?
 
-    public init(content: [ContentBlock], isError: Bool = false) {
+    private enum CodingKeys: String, CodingKey {
+        case content, isError, structuredContent
+        case meta = "_meta"
+    }
+
+    public init(
+        content: [ContentBlock],
+        isError: Bool = false,
+        structuredContent: JSONValue? = nil,
+        meta: JSONValue? = nil
+    ) {
         self.content = content
         self.isError = isError
+        self.structuredContent = structuredContent
+        self.meta = meta
     }
 
     /// Convenience: create a text-only result.
     public init(text: String, isError: Bool = false) {
-        self.content = [.text(text)]
-        self.isError = isError
+        self.init(content: [.text(text)], isError: isError)
     }
 }
 
@@ -78,12 +94,16 @@ public struct ResourceContent: Sendable {
     public let mimeType: String
     public let text: String?
     public let blob: Data?
+    /// The resource's `_meta`. For an HTML MCP App, `_meta.ui.csp` lists the
+    /// origins its view may load from and connect to.
+    public let meta: JSONValue?
 
-    public init(uri: String, mimeType: String, text: String? = nil, blob: Data? = nil) {
+    public init(uri: String, mimeType: String, text: String? = nil, blob: Data? = nil, meta: JSONValue? = nil) {
         self.uri = uri
         self.mimeType = mimeType
         self.text = text
         self.blob = blob
+        self.meta = meta
     }
 }
 

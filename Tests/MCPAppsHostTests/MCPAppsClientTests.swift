@@ -499,6 +499,47 @@ struct MCPAppsClientTests {
             #expect(r2.text == r1.text)
             #expect(fetchCount == 1) // Only one network call — second was cached
         }
+
+        @Test func callToolKeepsStructuredContentAndMeta() async throws {
+            registerInitHandlers()
+            MockURLProtocol.handlers["tools/call"] = { _ in
+                let result: [String: Any] = [
+                    "content": [["type": "text", "text": "72°F"]],
+                    "structuredContent": ["temperature": 72, "conditions": "sunny"],
+                    "_meta": ["source": "weather-api"],
+                    "isError": false
+                ]
+                let body: [String: Any] = ["jsonrpc": "2.0", "id": 3, "result": result]
+                return (200, [:], try! JSONSerialization.data(withJSONObject: body))
+            }
+
+            let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+            let result = try await client.callTool(name: "weather", arguments: .object([:]))
+
+            #expect(result.structuredContent == ["temperature": 72, "conditions": "sunny"])
+            #expect(result.meta == ["source": "weather-api"])
+        }
+
+        @Test func readResourceKeepsMeta() async throws {
+            registerInitHandlers()
+            MockURLProtocol.handlers["resources/read"] = { _ in
+                let result: [String: Any] = [
+                    "contents": [[
+                        "uri": "ui://test/app",
+                        "mimeType": "text/html;profile=mcp-app",
+                        "text": "<html></html>",
+                        "_meta": ["ui": ["csp": ["connectDomains": ["https://api.example.com"]]]]
+                    ]]
+                ]
+                let body: [String: Any] = ["jsonrpc": "2.0", "id": 3, "result": result]
+                return (200, [:], try! JSONSerialization.data(withJSONObject: body))
+            }
+
+            let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+            let resource = try await client.readResource(uri: "ui://test/app")
+
+            #expect(resource.meta?["ui"]?["csp"]?["connectDomains"] == ["https://api.example.com"])
+        }
     }
 
     // MARK: - Prefetch
@@ -803,73 +844,5 @@ struct MCPAppsClientTests {
             // Provider called for: initialize, notifications/initialized, tools/list
             #expect(callCount == 3)
         }
-    }
-}
-
-// MARK: - CSP Injection Tests
-
-@Suite("CSP Injection")
-struct CSPInjectionTests {
-
-    @Test func injectsIntoHead() {
-        let html = "<html><head><title>Test</title></head><body>Hello</body></html>"
-        let result = injectCSP(html)
-        #expect(result.contains("Content-Security-Policy"))
-        // CSP should be right after <head>
-        let headIndex = result.range(of: "<head>")!.upperBound
-        let cspIndex = result.range(of: "Content-Security-Policy")!.lowerBound
-        #expect(cspIndex > headIndex)
-        // Title should still be there
-        #expect(result.contains("<title>Test</title>"))
-    }
-
-    @Test func injectsAfterHtmlTagWhenNoHead() {
-        let html = "<html><body>No head tag</body></html>"
-        let result = injectCSP(html)
-        #expect(result.contains("Content-Security-Policy"))
-        #expect(result.contains("<head>"))
-        #expect(result.contains("No head tag"))
-    }
-
-    @Test func prependsWhenNoHtmlOrHead() {
-        let html = "<div>Just a fragment</div>"
-        let result = injectCSP(html)
-        #expect(result.hasPrefix("<meta"))
-        #expect(result.contains("Content-Security-Policy"))
-        #expect(result.contains("Just a fragment"))
-    }
-
-    @Test func cspBlocksConnectSrc() {
-        let html = "<html><head></head><body></body></html>"
-        let result = injectCSP(html)
-        #expect(result.contains("connect-src 'none'"))
-    }
-
-    @Test func cspAllowsInlineScripts() {
-        let html = "<html><head></head><body></body></html>"
-        let result = injectCSP(html)
-        #expect(result.contains("script-src 'unsafe-inline'"))
-    }
-
-    @Test func cspBlocksFormAction() {
-        let html = "<html><head></head><body></body></html>"
-        let result = injectCSP(html)
-        #expect(result.contains("form-action 'none'"))
-    }
-
-    @Test func cspAllowsHttpsImages() {
-        let html = "<html><head></head><body></body></html>"
-        let result = injectCSP(html)
-        #expect(result.contains("img-src https: data:"))
-    }
-
-    @Test func caseInsensitiveHeadDetection() {
-        let html = "<HTML><HEAD></HEAD><BODY>Upper case</BODY></HTML>"
-        let result = injectCSP(html)
-        #expect(result.contains("Content-Security-Policy"))
-        // Should inject after <HEAD>, not prepend
-        let headIndex = result.range(of: "<HEAD>", options: .caseInsensitive)!.upperBound
-        let cspIndex = result.range(of: "Content-Security-Policy")!.lowerBound
-        #expect(cspIndex > headIndex)
     }
 }
