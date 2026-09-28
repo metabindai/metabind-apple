@@ -1,6 +1,8 @@
-# Metabind for Apple
+# Metabind for Apple: MCP Apps host and Assistant SDK for SwiftUI
 
-The native Apple SDK for Metabind. Embed a governed agent in your iOS, macOS, or visionOS app, and render Metabind-managed content as native SwiftUI.
+`MCPAppsHost` is an MCP Apps host for SwiftUI apps on iOS and macOS: it renders MCP App UIs written in BindJS as native SwiftUI views, with no WebView. `MetabindAI`, the Assistant SDK, is built on it and puts a governed agent inside your own app, using the same MCP App you publish to Claude, ChatGPT, and every MCP host.
+
+**What it renders.** BindJS resources (`application/vnd.bindjs+json`) are drawn by the Apache 2.0 [BindJS SwiftUI renderer](https://github.com/metabindai/bindjs-apple), with component logic running in JavaScriptCore.
 
 ## What this is
 
@@ -14,7 +16,7 @@ This package is the Apple side. It ships three libraries you can adopt independe
 | `MCPAppsHost` | Render a single MCP tool result without the conversational layer. The low-level building blocks (`MCPAppsClient`, `MCPAppSession`, `MCPAppView`) that `MetabindAI` is built on. |
 | `MetabindContent` | Fetch and render content from Metabind's content platform. A SwiftUI view, an async/await GraphQL client, SQLite-backed caching, and real-time updates over WebSocket. |
 
-Everything renders through BindJS as real native SwiftUI, not web views. The three libraries have different dependency footprints, so you import only the ones you use: a content-only app doesn't link the assistant, and an assistant-only app doesn't link the GraphQL client.
+Everything written in BindJS renders as native SwiftUI, not in a web view. The three libraries have different dependency footprints, so you import only the ones you use: a content-only app doesn't link the assistant, and an assistant-only app doesn't link the GraphQL client.
 
 > [!NOTE]
 > BindJS is the open component language for agent UI, rendered natively as SwiftUI, Jetpack Compose, and React; the SwiftUI rendering engine is its Apple half. This SDK depends on it as a source package — [`metabindai/bindjs-apple`](https://github.com/metabindai/bindjs-apple), Apache 2.0 — so the code rendering your UI is open, auditable, and steppable in the debugger. All of BindJS is open source: the runtime and React renderer, and the native SwiftUI and Jetpack Compose engines.
