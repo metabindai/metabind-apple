@@ -260,11 +260,12 @@ public actor MCPAppsClient: MCPServer {
 
     /// Warms the resource cache for `uris` without blocking the caller.
     ///
-    /// Each URI is fetched at most once — already-cached and already-in-flight
-    /// URIs are skipped, and failures are swallowed, since a prefetch miss just
-    /// means the later `readResource` pays the fetch it would have paid anyway.
+    /// Each URI is fetched at most once — URIs that are cached and still fresh,
+    /// or already in flight, are skipped, and failures are swallowed, since a
+    /// prefetch miss just means the later `readResource` pays the fetch it would
+    /// have paid anyway.
     public func prefetchResources(_ uris: [String]) {
-        let pending = uris.filter { !resourceCache.contains($0) && inFlightReads[$0] == nil }
+        let pending = uris.filter { resourceCache.peek($0)?.isFresh != true && inFlightReads[$0] == nil }
         guard !pending.isEmpty else { return }
 
         log.info("prefetching \(pending.count) UI resource(s)")
@@ -1200,9 +1201,9 @@ struct OrderedCache<Key: Hashable, Value>: Sendable where Key: Sendable, Value: 
         self.maxEntries = maxEntries
     }
 
-    /// Membership test that leaves the LRU order untouched.
-    func contains(_ key: Key) -> Bool {
-        storage[key] != nil
+    /// Lookup that leaves the LRU order untouched.
+    func peek(_ key: Key) -> Value? {
+        storage[key]
     }
 
     mutating func get(_ key: Key) -> Value? {

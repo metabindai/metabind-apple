@@ -167,6 +167,17 @@ struct MCPAppsClientTests {
             #expect(cache.get("b") == nil)
         }
 
+        @Test func peekLeavesOrderUntouched() {
+            var cache = OrderedCache<String, Int>(maxEntries: 3)
+            cache.set("a", 1)
+            cache.set("b", 2)
+            cache.set("c", 3)
+            #expect(cache.peek("a") == 1)
+            cache.set("d", 4)
+            #expect(cache.peek("a") == nil)
+            #expect(cache.peek("b") == 2)
+        }
+
         @Test func overwriteUpdatesValue() {
             var cache = OrderedCache<String, Int>(maxEntries: 3)
             cache.set("a", 1)
@@ -1741,6 +1752,64 @@ struct MCPAppsClientTests {
 
             #expect(a.text == b.text)
             #expect(Self.readCount() == 1) // second joined the in-flight request
+        }
+
+        /// Two ui:// tools and their resources as a 2026-07-28 server serves
+        /// them, with reads fresh for `ttlMs`.
+        static func registerModernTools(ttlMs: Int) {
+            registerModernDiscoverHandler()
+            MockURLProtocol.handlers["tools/list"] = { req in
+                let tools: [[String: Any]] = [
+                    ["name": "card_a", "_meta": ["ui": ["resourceUri": "ui://test/a"]]],
+                    ["name": "card_b", "_meta": ["ui": ["resourceUri": "ui://test/b"]]]
+                ]
+                let body: [String: Any] = [
+                    "jsonrpc": "2.0", "id": req.json?["id"] ?? 2,
+                    "result": ["resultType": "complete", "tools": tools]
+                ]
+                return (200, [:], try! JSONSerialization.data(withJSONObject: body))
+            }
+            MockURLProtocol.handlers["resources/read"] = { req in
+                let params = (req.json?["params"] as? [String: Any]) ?? [:]
+                let uri = params["uri"] as? String ?? "ui://test/unknown"
+                let result: [String: Any] = [
+                    "resultType": "complete",
+                    "ttlMs": ttlMs,
+                    "cacheScope": "private",
+                    "contents": [["uri": uri, "mimeType": "application/vnd.bindjs+json", "text": "{\"ok\":true}"]]
+                ]
+                let body: [String: Any] = ["jsonrpc": "2.0", "id": req.json?["id"] ?? 3, "result": result]
+                return (200, [:], try! JSONSerialization.data(withJSONObject: body))
+            }
+        }
+
+        @Test func listToolsWarmsUIResourcesFromModernServer() async throws {
+            Self.registerModernTools(ttlMs: 60_000)
+
+            let client = MCPAppsClient(url: mockURL, configuration: .init(prefetchUIResources: true, urlSession: mockSession()))
+            _ = try await client.listTools()
+            await Self.waitForReads(2)
+            #expect(Self.readCount() == 2)
+
+            // The render finds the prefetched resource, and listing tools again
+            // leaves fresh resources alone.
+            _ = try await client.readResource(uri: "ui://test/a")
+            _ = try await client.listTools()
+            try await Task.sleep(nanoseconds: 100_000_000)
+            #expect(Self.readCount() == 2)
+        }
+
+        @Test func listToolsRewarmsExpiredModernResources() async throws {
+            Self.registerModernTools(ttlMs: 1)
+
+            let client = MCPAppsClient(url: mockURL, configuration: .init(prefetchUIResources: true, urlSession: mockSession()))
+            _ = try await client.listTools()
+            await Self.waitForReads(2)
+            try await Task.sleep(nanoseconds: 20_000_000)
+
+            _ = try await client.listTools()
+            await Self.waitForReads(4)
+            #expect(Self.readCount() == 4)
         }
     }
 
