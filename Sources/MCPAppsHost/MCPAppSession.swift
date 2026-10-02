@@ -381,8 +381,23 @@ public class MCPAppSession: Identifiable {
             throw MCPAppError.unsupportedContentType(mimeType: resource.mimeType)
         }
         log.info("[\(self.toolName, privacy: .public)] Resolving with \(String(describing: type(of: resolver)), privacy: .public)")
-        resolvedContent = try await resolver.resolve(resource)
-        try Task.checkCancellation()
+        do {
+            let content = try await resolver.resolve(resource, server: server)
+            try Task.checkCancellation()
+            resolvedContent = content
+        } catch {
+            try Task.checkCancellation()
+            guard BindJSViewResolver().canResolve(mimeType: resource.mimeType),
+                  !(error is CancellationError),
+                  (error as? URLError)?.code != .cancelled else { throw error }
+            log.error("BindJS View rejected; requesting HTML: \(String(describing: error), privacy: .public)")
+            let html = try await server.readHTMLResource(uri: uri)
+            try Task.checkCancellation()
+            guard HTMLResolver().canResolve(mimeType: html.mimeType) else {
+                throw MCPAppError.unsupportedContentType(mimeType: html.mimeType)
+            }
+            resolvedContent = try await HTMLResolver().resolve(html)
+        }
     }
 
     // MARK: - Execution
