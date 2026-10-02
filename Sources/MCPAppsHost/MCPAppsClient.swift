@@ -74,7 +74,22 @@ public actor MCPAppsClient: MCPServer {
     private var protocolEra: ProtocolEra?
     private var protocolVersion: String?
     private var sessionId: String?
+    private var htmlClient: MCPAppsClient?
     private var nextRequestId = 1
+
+    private struct ResourceListing: Sendable {
+        let resources: [MCPResource]
+        let expiresAt: Date?
+        var isFresh: Bool { expiresAt.map { Date() < $0 } ?? true }
+    }
+    private struct ResourceDiscovery {
+        let id: UUID
+        let task: Task<ResourceListing, any Error>
+    }
+    private var resourceListing: ResourceListing?
+    private var resourceDiscovery: ResourceDiscovery?
+    private var discoveryGeneration: UInt64 = 0
+    private var prefetches: [String: UUID] = [:]
     private var toolHeaderMappings: [String: [ToolHeaderMapping]] = [:]
 
     /// LRU resource cache keyed by URI.
@@ -264,19 +279,45 @@ public actor MCPAppsClient: MCPServer {
         return try await task.value
     }
 
-    /// Warms the resource cache for `uris` without blocking the caller.
-    ///
-    /// Each URI is fetched at most once — URIs that are cached and still fresh,
-    /// or already in flight, are skipped, and failures are swallowed, since a
-    /// prefetch miss just means the later `readResource` pays the fetch it would
-    /// have paid anyway.
+    /// Warms View resources and their verified packages without blocking discovery.
+    /// Package downloads still use HTTP freshness rules, even after prefetching.
     public func prefetchResources(_ uris: [String]) {
-        let pending = uris.filter { resourceCache.peek($0)?.isFresh != true && inFlightReads[$0] == nil }
+        let pending = Set(uris).filter {
+            resourceCache.peek($0)?.isFresh != true && inFlightReads[$0] == nil && prefetches[$0] == nil
+        }
         guard !pending.isEmpty else { return }
-
-        log.info("prefetching \(pending.count) UI resource(s)")
-        for uri in pending {
-            Task { _ = try? await self.readResource(uri: uri) }
+        let id = UUID()
+        let generation = discoveryGeneration
+        for uri in pending { prefetches[uri] = id }
+        Task {
+            defer {
+                for uri in pending where self.prefetches[uri] == id { self.prefetches[uri] = nil }
+            }
+            // Multiple Views commonly reference the same project package. Warm
+            // that package once per batch, after fetching each View's metadata.
+            var packages: Set<[JSONValue]> = []
+            for uri in pending {
+                guard generation == self.discoveryGeneration else { return }
+                do {
+                    let resource = try await self.readResource(uri: uri)
+                    guard generation == self.discoveryGeneration else { return }
+                    guard BindJSViewResolver().canResolve(mimeType: resource.mimeType),
+                          let resolver = self.resolvers.first(where: { $0.canResolve(mimeType: resource.mimeType) }) else { continue }
+                    let meta = resource.meta?["ui"]?["bindjs"]
+                    if let package = meta?["package"] {
+                        let key = [package, meta?["sha256"] ?? .null, meta?["size"] ?? .null]
+                        guard !packages.contains(key) else { continue }
+                        _ = try await resolver.resolve(resource, server: self)
+                        packages.insert(key)
+                    } else {
+                        _ = try await resolver.resolve(resource, server: self)
+                    }
+                } catch {
+                    // Prefetch is best effort; rendering retries through the same
+                    // verification path and owns any user-visible fallback.
+                    log.debug("UI resource prefetch did not complete")
+                }
+            }
         }
     }
 
@@ -304,8 +345,13 @@ public actor MCPAppsClient: MCPServer {
             uri: first["uri"] as? String ?? uri,
             mimeType: mimeType,
             text: first["text"] as? String,
-            blob: (first["blob"] as? String).flatMap { Data(base64Encoded: $0) }
+            blob: (first["blob"] as? String).flatMap { Data(base64Encoded: $0) },
+            meta: first["_meta"].map { JSONValue.from($0) }
         )
+
+        // Package bytes must always pass through the package transport. MCP
+        // resource TTLs must not bypass HTTP freshness on subsequent loads.
+        if BindJSViewResolver.isPackage(mimeType: mimeType) { return resource }
 
         switch protocolEra {
         case .legacy:
@@ -323,6 +369,71 @@ public actor MCPAppsClient: MCPServer {
             }
         case nil:
             break
+        }
+        return resource
+    }
+
+    /// Discovers resource metadata. Modern results obey the shortest page ttlMs;
+    /// legacy listings are reused until clearResourceCache() or reconnection.
+    public func listResources() async throws -> [MCPResource] {
+        try await ensureConnected()
+        if let resourceListing, resourceListing.isFresh { return resourceListing.resources }
+        if let resourceDiscovery { return try await resourceDiscovery.task.value.resources }
+        let id = UUID()
+        let generation = discoveryGeneration
+        let task = Task { try await self.performResourceDiscovery() }
+        resourceDiscovery = ResourceDiscovery(id: id, task: task)
+        defer { if resourceDiscovery?.id == id { resourceDiscovery = nil } }
+        let listing = try await task.value
+        if generation == discoveryGeneration { resourceListing = listing }
+        return listing.resources
+    }
+
+    private func performResourceDiscovery() async throws -> ResourceListing {
+        var resources: [MCPResource] = []
+        var cursor: String?
+        var seenCursors: Set<String> = []
+        var expiresAt: Date?
+        repeat {
+            let params: [String: Any] = cursor.map { ["cursor": $0] } ?? [:]
+            let response = try await sendRequest(method: "resources/list", params: params)
+            try Task.checkCancellation()
+            guard let result = response["result"] as? [String: Any],
+                  let items = result["resources"] as? [[String: Any]] else {
+                throw MCPClientError.invalidResponse("Missing resources in resources/list response")
+            }
+            try validateResultType(in: result, method: "resources/list")
+            if protocolEra == .modern {
+                let ttl = result["ttlMs"] as? NSNumber
+                let seconds = ttl.flatMap { !isJSONBoolean($0) && $0.doubleValue.isFinite ? max(0, $0.doubleValue / 1000) : nil } ?? 0
+                let pageExpiry = Date().addingTimeInterval(seconds)
+                expiresAt = expiresAt.map { min($0, pageExpiry) } ?? pageExpiry
+            }
+            resources += items.compactMap { item in
+                guard let uri = item["uri"] as? String else { return nil }
+                return MCPResource(uri: uri, mimeType: item["mimeType"] as? String,
+                                   meta: item["_meta"].map { JSONValue.from($0) })
+            }
+            cursor = result["nextCursor"] as? String
+            if let cursor, !seenCursors.insert(cursor).inserted {
+                throw MCPClientError.invalidResponse("Repeated resources/list cursor")
+            }
+        } while cursor != nil
+        return ResourceListing(resources: resources, expiresAt: expiresAt)
+    }
+
+    public func readHTMLResource(uri: String) async throws -> ResourceContent {
+        if htmlClient == nil {
+            var config = configuration
+            config.prefetchUIResources = false
+            // Keep fallback reads fresh with respect to explicit resource reloads.
+            config.maxCacheEntries = 0
+            htmlClient = MCPAppsClient(url: url, headerProvider: headerProvider,
+                                       resolvers: [HTMLResolver()], configuration: config)
+        }
+        let resource = try await htmlClient!.readResource(uri: uri)
+        guard HTMLResolver().canResolve(mimeType: resource.mimeType) else {
+            throw MCPAppError.unsupportedContentType(mimeType: resource.mimeType)
         }
         return resource
     }
@@ -402,6 +513,10 @@ public actor MCPAppsClient: MCPServer {
 
     /// Clears the resource cache. Call when the server notifies that resources have changed.
     public func clearResourceCache() {
+        discoveryGeneration &+= 1
+        resourceListing = nil
+        resourceDiscovery = nil
+        prefetches.removeAll()
         resourceCache.removeAll()
     }
 
@@ -748,7 +863,7 @@ public actor MCPAppsClient: MCPServer {
         protocolVersion = nil
         sessionId = nil
         toolHeaderMappings.removeAll()
-        resourceCache.removeAll()
+        clearResourceCache()
     }
 
     private func sendRequestRaw(
@@ -1233,6 +1348,7 @@ struct OrderedCache<Key: Hashable, Value>: Sendable where Key: Sendable, Value: 
     }
 
     mutating func set(_ key: Key, _ value: Value) {
+        guard maxEntries > 0 else { return }
         if storage[key] != nil {
             order.removeAll { $0 == key }
         } else if order.count >= maxEntries {

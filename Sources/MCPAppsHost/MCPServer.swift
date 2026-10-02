@@ -9,11 +9,23 @@ public protocol MCPServer: Sendable {
     /// Read a resource from the MCP server.
     func readResource(uri: String) async throws -> ResourceContent
 
+    /// Discover resources and their metadata, without downloading their bodies.
+    func listResources() async throws -> [MCPResource]
+
+    /// Read the HTML representation using an HTML-only negotiated connection.
+    func readHTMLResource(uri: String) async throws -> ResourceContent
+
     /// Discover available tools. Default returns empty.
     func listTools() async throws -> [MCPToolDefinition]
 }
 
 public extension MCPServer {
+    func listResources() async throws -> [MCPResource] { [] }
+
+    func readHTMLResource(uri: String) async throws -> ResourceContent {
+        throw MCPAppError.unsupportedContentType(mimeType: "text/html")
+    }
+
     func listTools() async throws -> [MCPToolDefinition] { [] }
 
     /// Execute a tool and unwrap the result into the consumer-facing shape.
