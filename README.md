@@ -127,19 +127,19 @@ Same view, same observable surface, a different conversation engine.
 
 `MetabindAssistant` is `@Observable`. Its `conversation`, `isProcessing`, `tools`, and `pendingContext` are all observable, so you can build an entirely custom interface instead of using `MetabindAssistantView`.
 
-### Published chat without sign-in
+### Authenticated project chat
 
-For a public MCP project, use its published endpoint (without `/draft`) and
-omit `apiKey` when constructing `MetabindAgentProvider`. The Agent service
-checks the project's public visibility on each request. Drafts and private
-projects still require credentials. No language-model provider key belongs in
-the client.
+Published and draft chat both require credentials. The host app signs the user in
+and supplies their access token as `apiKey` to `MetabindAgentProvider`, which sends
+`Authorization: Bearer <token>`. Empty credentials fail before network access.
+Existing project API-key integrations remain supported; model-provider secrets
+stay on the backend.
 
-The SDK creates a random `guestSessionID` per provider and sends it in
-`X-Metabind-Guest-Session` to isolate conversation history. To resume a guest
-conversation across provider instances, retain both that identifier and the
-conversation ID privately; never include them in shared project links.
-Guest chat requires an Agent deployment supporting public chat.
+Use a throwing async `MCPAppsClient` header provider to resolve a fresh account
+token per request. Throw if refresh fails so no anonymous request is sent. When
+recreating the Agent provider with a refreshed token, retain its conversation ID.
+Shared project links must not contain credentials. Published endpoints omit
+`/draft`; only draft endpoints load saved, unpublished edits.
 
 ### Preview saved project edits
 

@@ -2169,6 +2169,20 @@ struct MCPAppsClientTests {
     struct HeaderTests {
         init() { MockURLProtocol.reset() }
 
+        @Test func credentialFailurePreventsUnauthenticatedRequests() async throws {
+            struct SignInRequired: Error {}
+            let client = MCPAppsClient(
+                url: mockURL,
+                headerProvider: { throw SignInRequired() },
+                configuration: .init(urlSession: mockSession())
+            )
+            do {
+                _ = try await client.listTools()
+                Issue.record("Missing credentials must stop discovery")
+            } catch {}
+            #expect(MockURLProtocol.requestLog.isEmpty)
+        }
+
         @Test func dynamicHeaderProviderCalledPerRequest() async throws {
             var callCount = 0
             registerInitHandlers()
