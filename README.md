@@ -237,7 +237,7 @@ import MetabindContent
 struct MyApp: App {
     @State var client = MetabindClient(
         url: URL(string: "https://api.metabind.ai/graphql")!,
-        ws: URL(string: "wss://api.metabind.ai/graphql")!,
+        ws: URL(string: "wss://ws-api.metabind.ai")!,
         apiKey: "your-api-key",
         organizationId: "your-org-id",
         projectId: "your-project-id"
