@@ -156,12 +156,15 @@ public struct ResourceContent: Sendable {
     public let mimeType: String
     public let text: String?
     public let blob: Data?
+    /// MCP resource metadata, including `_meta.ui.bindjs`.
+    public let meta: JSONValue?
 
-    public init(uri: String, mimeType: String, text: String? = nil, blob: Data? = nil) {
+    public init(uri: String, mimeType: String, text: String? = nil, blob: Data? = nil, meta: JSONValue? = nil) {
         self.uri = uri
         self.mimeType = mimeType
         self.text = text
         self.blob = blob
+        self.meta = meta
     }
 }
 
@@ -192,5 +195,18 @@ public struct ModelContext: Sendable {
     public init(content: [ContentBlock]? = nil, structuredContent: JSONValue? = nil) {
         self.content = content
         self.structuredContent = structuredContent
+    }
+}
+
+/// A resource advertised by `resources/list`, before its body is downloaded.
+public struct MCPResource: Sendable {
+    public let uri: String
+    public let mimeType: String?
+    public let meta: JSONValue?
+
+    public init(uri: String, mimeType: String? = nil, meta: JSONValue? = nil) {
+        self.uri = uri
+        self.mimeType = mimeType
+        self.meta = meta
     }
 }

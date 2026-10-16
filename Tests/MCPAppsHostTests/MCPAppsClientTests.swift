@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import CryptoKit
 @testable import MCPAppsHost
 
 // MARK: - Mock URLProtocol
@@ -2191,6 +2192,203 @@ struct MCPAppsClientTests {
             #expect(callCount == 4)
         }
     }
+    @Test func resourceListingsPreserveMetadataAcrossPages() async throws {
+        registerInitHandlers()
+        MockURLProtocol.handlers["resources/list"] = { req in
+            let cursor = (req.json?["params"] as? [String: Any])?["cursor"] as? String
+            let item: [String: Any] = ["uri": cursor == nil ? "ui://view" : "ui://package",
+                                      "mimeType": "application/bindjs-package+json",
+                                      "_meta": ["ui": ["bindjs": ["spec": "1.0", "sha256": "digest"]]]]
+            var result: [String: Any] = ["resources": [item]]
+            if cursor == nil { result["nextCursor"] = "page2" }
+            return (200, [:], try! JSONSerialization.data(withJSONObject: ["result": result]))
+        }
+        let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+        let resources = try await client.listResources()
+        #expect(resources.map(\.uri) == ["ui://view", "ui://package"])
+        #expect(resources[1].meta?["ui"]?["bindjs"]?["sha256"]?.stringValue == "digest")
+    }
+
+    @Test func packageReadsPreserveMetadataAndBypassTheURIResponseCache() async throws {
+        registerInitHandlers()
+        MockURLProtocol.handlers["resources/read"] = { _ in
+            let item: [String: Any] = ["uri": "ui://package", "mimeType": "application/bindjs-package+json",
+                                      "text": "package", "_meta": ["ui": ["bindjs": ["spec": "1.0"]]]]
+            return (200, [:], try! JSONSerialization.data(withJSONObject: ["result": ["contents": [item]]]))
+        }
+        let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+        let first = try await client.readResource(uri: "ui://package")
+        _ = try await client.readResource(uri: "ui://package")
+        #expect(first.meta?["ui"]?["bindjs"]?["spec"]?.stringValue == "1.0")
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "resources/read" }.count == 2)
+    }
+
+    @Test func htmlFallbackNegotiatesItsOwnSessionAndPreservesTheNativeSession() async throws {
+        registerInitHandlers(sessionId: "native")
+        let initialize = MockURLProtocol.handlers["initialize"]!
+        MockURLProtocol.handlers["initialize"] = { req in
+            let params = req.json?["params"] as? [String: Any]
+            let capabilities = params?["capabilities"] as? [String: Any]
+            let extensions = capabilities?["extensions"] as? [String: Any]
+            let ui = extensions?["io.modelcontextprotocol/ui"] as? [String: Any]
+            let mimeTypes = ui?["mimeTypes"] as? [String] ?? []
+            let (status, _, data) = initialize(req)
+            return (status, ["Mcp-Session-Id": mimeTypes == ["text/html;profile=mcp-app"] ? "html" : "native"], data)
+        }
+        MockURLProtocol.handlers["resources/read"] = { req in
+            #expect(req.urlRequest.value(forHTTPHeaderField: "Authorization") == "Bearer test")
+            let html = req.urlRequest.value(forHTTPHeaderField: "Mcp-Session-Id") == "html"
+            let item = ["uri": "ui://view", "mimeType": html ? "text/html" : "application/bindjs+json",
+                        "text": html ? "<p>fallback</p>" : "view"]
+            return (200, [:], try! JSONSerialization.data(withJSONObject: ["result": ["contents": [item]]]))
+        }
+        let client = MCPAppsClient(url: mockURL, headers: ["Authorization": "Bearer test"],
+                                   configuration: .init(urlSession: mockSession()))
+        _ = try await client.readResource(uri: "ui://view")
+        let html = try await client.readHTMLResource(uri: "ui://view")
+        #expect(html.text == "<p>fallback</p>")
+        await client.clearResourceCache()
+        let native = try await client.readResource(uri: "ui://view")
+        #expect(native.mimeType == "application/bindjs+json")
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "initialize" }.count == 2)
+    }
+
+    @Test func legacyResourceDiscoveryIsSharedAndInvalidatedExplicitly() async throws {
+        registerInitHandlers()
+        MockURLProtocol.handlers["resources/list"] = { _ in
+            (200, [:], Data(#"{"result":{"resources":[{"uri":"ui://package"}]}}"#.utf8))
+        }
+        let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+        async let a = client.listResources()
+        async let b = client.listResources()
+        _ = try await (a, b)
+        _ = try await client.listResources()
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "resources/list" }.count == 1)
+        await client.clearResourceCache()
+        _ = try await client.listResources()
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "resources/list" }.count == 2)
+    }
+
+    @Test func reconnectionInvalidatesResourceDiscovery() async throws {
+        registerInitHandlers()
+        MockURLProtocol.handlers["resources/list"] = { _ in
+            (200, [:], Data(#"{"result":{"resources":[{"uri":"ui://package"}]}}"#.utf8))
+        }
+        var attempts = 0
+        MockURLProtocol.handlers["tools/list"] = { _ in
+            attempts += 1
+            if attempts == 1 { return (404, [:], Data()) }
+            return (200, [:], Data(#"{"result":{"tools":[]}}"#.utf8))
+        }
+        let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+        _ = try await client.listResources()
+        _ = try await client.listTools()
+        _ = try await client.listResources()
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "resources/list" }.count == 2)
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "initialize" }.count == 2)
+    }
+
+    @Test(arguments: [60_000, 0, -1])
+    func modernResourceDiscoveryRespectsTTL(ttl: Int) async throws {
+        registerModernDiscoverHandler()
+        MockURLProtocol.handlers["resources/list"] = { req in
+            (200, [:], try! JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": req.json!["id"]!, "result": [
+                "resultType": "complete", "ttlMs": ttl, "resources": []
+            ]]))
+        }
+        let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+        _ = try await client.listResources()
+        _ = try await client.listResources()
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "resources/list" }.count == (ttl > 0 ? 1 : 2))
+    }
+
+    @Test func discoveryDoesNotCacheMissingTTLOrMalformedModernResults() async throws {
+        registerModernDiscoverHandler()
+        MockURLProtocol.handlers["resources/list"] = { req in
+            (200, [:], try! JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": req.json!["id"]!, "result": ["resultType": "complete", "resources": []]]))
+        }
+        let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+        _ = try await client.listResources()
+        _ = try await client.listResources()
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "resources/list" }.count == 2)
+        MockURLProtocol.handlers["resources/list"] = { req in
+            (200, [:], try! JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": req.json!["id"]!, "result": ["resources": [], "ttlMs": 60000]]))
+        }
+        await #expect(throws: MCPClientError.self) { try await client.listResources() }
+    }
+
+    @Test func resourceDiscoveryUsesShortestPageTTL() async throws {
+        registerModernDiscoverHandler()
+        MockURLProtocol.handlers["resources/list"] = { req in
+            let hasCursor = (req.json?["params"] as? [String: Any])?["cursor"] != nil
+            var result: [String: Any] = ["resultType": "complete", "resources": [], "ttlMs": hasCursor ? 0 : 60_000]
+            if !hasCursor { result["nextCursor"] = "next" }
+            return (200, [:], try! JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": req.json!["id"]!, "result": result]))
+        }
+        let client = MCPAppsClient(url: mockURL, configuration: .init(urlSession: mockSession()))
+        _ = try await client.listResources()
+        _ = try await client.listResources()
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "resources/list" }.count == 4)
+    }
+
+    @Test func prefetchWarmsSharedViewPackageOnceAndRenderStillUsesHTTPTransport() async throws {
+        registerInitHandlers()
+        let package = try JSONSerialization.data(withJSONObject: [
+            "name": UUID().uuidString, "version": "1.0.0", "spec": "1.0",
+            "components": ["Card": "exports.default = defineComponent({body: () => Text('prefetched')})"]
+        ])
+        let digest = SHA256.hash(data: package).map { String(format: "%02x", $0) }.joined()
+        let identity = try JSONSerialization.jsonObject(with: package) as! [String: Any]
+        let packageURI = "ui://test/package"
+        let cdnURL = "https://packages.test/prefetch.json"
+        let viewMeta: [String: Any] = ["ui": ["bindjs": ["spec": "1.0", "component": "Card",
+                                                       "package": packageURI, "sha256": digest, "size": package.count]]]
+        let packageMeta: [String: Any] = ["ui": ["bindjs": ["spec": "1.0", "name": identity["name"]!,
+                                                          "version": "1.0.0", "sha256": digest,
+                                                          "size": package.count, "contentUrl": cdnURL]]]
+        MockURLProtocol.handlers["tools/list"] = { _ in
+            let tools = ["a", "b"].map { ["name": $0, "_meta": ["ui": ["resourceUri": "ui://test/\($0)"]]] as [String: Any] }
+            return (200, [:], try! JSONSerialization.data(withJSONObject: ["result": ["tools": tools]]))
+        }
+        MockURLProtocol.handlers["resources/list"] = { _ in
+            (200, [:], try! JSONSerialization.data(withJSONObject: ["result": ["resources": [[
+                "uri": packageURI, "mimeType": "application/bindjs-package+json", "_meta": packageMeta
+            ]]]]))
+        }
+        MockURLProtocol.handlers["resources/read"] = { req in
+            let uri = (req.json?["params"] as! [String: Any])["uri"] as! String
+            return (200, [:], try! JSONSerialization.data(withJSONObject: ["result": ["contents": [[
+                "uri": uri, "mimeType": "application/bindjs+json", "_meta": viewMeta,
+                "text": #"{"spec":"1.0","component":"Card"}"#
+            ]]]]))
+        }
+        MockURLProtocol.handlers["unknown"] = { req in
+            #expect(req.urlRequest.url?.absoluteString == cdnURL)
+            #expect(req.urlRequest.cachePolicy == .useProtocolCachePolicy)
+            #expect(req.urlRequest.value(forHTTPHeaderField: "Authorization") == nil)
+            return (200, [:], package)
+        }
+        let resolver = BindJSViewResolver(urlSession: mockSession())
+        let client = MCPAppsClient(url: mockURL, headers: ["Authorization": "Bearer private-mcp-token"],
+                                   resolvers: [resolver, HTMLResolver()],
+                                   configuration: .init(prefetchUIResources: true, urlSession: mockSession()))
+        _ = try await client.listTools()
+        for _ in 0..<200 {
+            if VerifiedPackageCache.shared.get(digest) != nil,
+               MockURLProtocol.requestLog.filter({ $0.method == "resources/read" }).count == 2 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(VerifiedPackageCache.shared.get(digest) != nil)
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "resources/read" }.count == 2)
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "unknown" }.count == 1)
+        let view = try await client.readResource(uri: "ui://test/a")
+        _ = try await resolver.resolve(view, server: client)
+        // URLProtocol deliberately does not cache. A warm digest never skips
+        // the next URLSession request, while the metadata listing is reused.
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "unknown" }.count == 2)
+        #expect(MockURLProtocol.requestLog.filter { $0.method == "resources/list" }.count == 1)
+    }
+
 }
 
 // MARK: - CSP Injection Tests
@@ -2259,4 +2457,5 @@ struct CSPInjectionTests {
         let cspIndex = result.range(of: "Content-Security-Policy")!.lowerBound
         #expect(cspIndex > headIndex)
     }
+
 }

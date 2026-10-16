@@ -7,6 +7,14 @@ public protocol ContentResolver: Sendable {
     var supportedMimeTypes: [String] { get }
     func canResolve(mimeType: String) -> Bool
     func resolve(_ resource: ResourceContent) async throws -> ResolvedAppContent
+    /// Resolve resources that reference a separately advertised package.
+    func resolve(_ resource: ResourceContent, server: any MCPServer) async throws -> ResolvedAppContent
+}
+
+public extension ContentResolver {
+    func resolve(_ resource: ResourceContent, server: any MCPServer) async throws -> ResolvedAppContent {
+        try await resolve(resource)
+    }
 }
 
 /// What a ContentResolver produces.
@@ -179,7 +187,7 @@ extension BindJSBundle {
 }
 
 /// Default resolver chain: BindJS first, HTML fallback.
-public let defaultResolvers: [any ContentResolver] = [BindJSResolver(), HTMLResolver()]
+public let defaultResolvers: [any ContentResolver] = [BindJSViewResolver(), BindJSResolver(), HTMLResolver()]
 
 /// Process-wide caches MCPAppsHost keeps outside any one client.
 public enum MCPAppsCaches {
@@ -189,6 +197,7 @@ public enum MCPAppsCaches {
     /// bytes, this one holds the parse of them. A debug reset wants both.
     public static func invalidateBindJSPackage() {
         BindJSPackageCache.shared.invalidate()
+        VerifiedPackageCache.shared.invalidate()
     }
 }
 

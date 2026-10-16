@@ -176,10 +176,11 @@ struct ResolverTests {
 
     @Test func defaultResolversPreferBindJS() {
         let resolvers = defaultResolvers
-        #expect(resolvers.count == 2)
+        #expect(resolvers.count == 3)
 
         // BindJS resolver should be first (preferred)
-        #expect(resolvers[0].canResolve(mimeType: "application/json"))
-        #expect(resolvers[1].canResolve(mimeType: "text/html"))
+        #expect(resolvers[0].canResolve(mimeType: "application/bindjs+json"))
+        #expect(resolvers[1].canResolve(mimeType: "application/json"))
+        #expect(resolvers[2].canResolve(mimeType: "text/html"))
     }
 }

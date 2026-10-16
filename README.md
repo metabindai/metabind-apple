@@ -219,6 +219,45 @@ struct ContentView: View {
 
 The session finds the tool's UI through `toolDefinition`: `listTools()` returns each tool's definition, including the `ui://` resource named in its `_meta.ui`. Without a definition, the session runs the tool but has no UI resource to fetch, so only the text of the tool result renders.
 
+### BindJS View packages and HTTP caching
+
+The default resolver chain advertises `application/bindjs+json;version=1.0`, the legacy
+`application/vnd.bindjs+json`, and HTML. The View channel carries an entry component
+and references a separate package using `_meta.ui.bindjs`. `MCPAppsClient.listResources()`
+exposes listing metadata; `ResourceContent.meta` preserves content-item metadata,
+which takes precedence over the listing.
+Concurrent discovery requests share one listing. Modern MCP listings obey the shortest
+page `ttlMs`; legacy listings are reused until `clearResourceCache()` or reconnection.
+When UI prefetching is enabled, discovery also warms each referenced package once per
+batch. Subsequent rendering still goes through URLSession's HTTP freshness checks.
+
+For each View load, `BindJSViewResolver` prefers the package's HTTPS `contentUrl`.
+It uses a dedicated shared `URLSession` and `URLCache` with `.useProtocolCachePolicy`:
+server `Cache-Control`, expiration, and validators govern reuse. The default cache
+has 16 MiB of memory and 128 MiB of disk capacity; it is an evictable HTTP cache,
+not guaranteed offline storage. A custom package session can be passed to
+`BindJSViewResolver(urlSession:)`. MCP authorization and session headers are not
+forwarded to the package URL.
+
+The resolver checks SHA-256 and byte count before using component sources, including
+bytes returned from URLCache. A bounded in-memory cache keyed by digest saves JSON
+decoding only; it never skips HTTP freshness checks. `no-store` also prevents decoded
+sources from being retained in that cache. Currently displayed Views keep the sources
+needed for their active runtime. `MCPAppsCaches.invalidateBindJSPackage()` clears decoded
+caches; it does not purge the HTTP cache.
+
+A failed CDN request falls back to `resources/read` for the package, with the same
+integrity checks. Package responses bypass the client's URI response cache. Integrity
+or document errors cause `MCPAppSession` to request an HTML representation through a
+separate HTML-only MCP connection, without changing the native connection's negotiation.
+Custom `MCPServer` implementations can provide `listResources()` and
+`readHTMLResource(uri:)` to support these paths; their defaults are an empty listing
+and an unsupported-type error, respectively.
+
+This implements the deployed 1.0 **referenced-package View channel**. Inline packages,
+package dependencies, unsupported specification versions, and View documents containing
+`props` are rejected and use HTML fallback. The content channel is not advertised.
+
 ---
 
 ## MetabindContent: the content SDK
