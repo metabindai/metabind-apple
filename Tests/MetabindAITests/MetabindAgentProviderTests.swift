@@ -57,6 +57,19 @@ struct MetabindAgentProviderTests {
         }
     }
 
+    @Test func publishedAndDraftRequireCredentialsBeforeNetworkRequest() async throws {
+        defer { MockURLProtocol.uninstall() }
+        let session = MockURLProtocol.install { _ in .sse("") }
+        for draft in [false, true] {
+            for credential in ["", "   "] {
+                let provider = MetabindAgentProvider(apiKey: credential, orgId: "org", projectId: "project", draft: draft, urlSession: session)
+                let events = await collect(provider.stream(messages: [.user("Hello")], tools: nil, systemPrompt: nil))
+                #expect(MockURLProtocol.capturedRequest() == nil)
+                #expect(events.contains { if case .error = $0 { return true }; return false })
+            }
+        }
+    }
+
     // MARK: - Request shape
 
     @Test func buildsExpectedRequest() async throws {
@@ -88,6 +101,7 @@ struct MetabindAgentProviderTests {
             try JSONSerialization.jsonObject(with: body) as? [String: Any]
         )
         #expect(json["stream"] as? Bool == true)
+        #expect(json["draft"] == nil)
         #expect(json["conversationId"] == nil) // no conversationId on first call
         let messages = try #require(json["messages"] as? [[String: Any]])
         #expect(messages.count == 1)
@@ -96,6 +110,21 @@ struct MetabindAgentProviderTests {
     }
 
     // MARK: - Event translation
+
+    @Test func previewRequestsSavedDraftConfiguration() async throws {
+        defer { MockURLProtocol.uninstall() }
+        let session = MockURLProtocol.install { _ in
+            .sse("event: message_stop\ndata: {\"stopReason\":\"end_turn\"}\n\n")
+        }
+        let provider = MetabindAgentProvider(
+            baseURL: Self.baseURL, apiKey: "preview-key", orgId: "org", projectId: "project",
+            draft: true, urlSession: session
+        )
+        _ = await collect(provider.stream(messages: [.user("hello")], tools: nil, systemPrompt: nil))
+        let body = try #require(MockURLProtocol.capturedBody())
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["draft"] as? Bool == true)
+    }
 
     @Test func textDeltaEmitsTextDelta() async {
         defer { MockURLProtocol.uninstall() }
