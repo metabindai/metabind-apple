@@ -28,7 +28,7 @@ Scope is the deployed referenced-package View representation. Inline packages an
 The Finance QR project is the production Banking Assistant (`finance-app`) in Metabind:
 `IgJH0BzIn4LlfnCbcDc7 / GLbHk5i3GLlIYcF63XFl`.
 
-On 2026-10-02, the production endpoint passed `LiveBindJSViewTests` anonymously with the default new MIME type. The test discovered a BindJS View, resolved its integrity-checked package, constructed its native BindJS component tree and SwiftUI view, and read the separately negotiated HTML representation. No tools were called and no project content was changed. This is a programmatic rendering check, not a visual device walkthrough.
+On 2026-10-02, the production endpoint passed `LiveBindJSViewTests` anonymously with the default new MIME type. The test discovered a BindJS View, resolved its integrity-checked package, constructed its native BindJS component tree and SwiftUI view, and read the separately negotiated HTML representation. No tools were called and no project content was changed. This October 2 run was a programmatic rendering check. The simulator walkthrough below supplements it.
 
 The prior deployment's legacy-only listing/CDN failure is resolved. Relevant backend View-channel E2E fixes were merged in `metabind-mcp` PR #271 on September 30; production release v1.0.20 followed October 1.
 
@@ -43,3 +43,17 @@ swift test --filter LiveBindJSViewTests
 ```
 
 The expected MIME type defaults to `application/bindjs+json`. For legacy compatibility checks only, set `MCP_APPS_TEST_MIME=application/vnd.bindjs+json`. Token contents are read from the local file, never placed in command arguments or committed.
+
+## iOS simulator validation — 2026-10-16
+
+An external validation app linked directly to SDK commit `c86b3de`, using BindJS 1.2.0, ran on an iPhone 17 Pro simulator with iOS 26.5 (23F77). It hosted the published Finance cards with `MCPAppView` and `MetabindHostBridge`; data calls went to the real production project. This tested SDK rendering and interactions, not the full conversational app or an LLM turn.
+
+- Visually checked subscriptions, spending breakdown, net-worth chart, and transactions.
+- The subscriptions Price rises filter narrowed the list from eight to two. The ClassPass Charge history action delivered the expected follow-up message to the host. Transactions Largest sorting changed the list to descending amounts.
+- The actual default `PackageHTTPTransport.session` downloaded the 301,508-byte production package, matching its published SHA-256. A subsequent process (PID 91394, following PID 91324) loaded it with URLSession metrics reporting `localCache`, zero request bytes, and zero received network bytes. The same result held after a full simulator shutdown/boot (PID 91741). Its URL was present in the on-disk URLCache database.
+- A loopback fixture served the same bytes with controlled cache headers through the same default session. The fresh `max-age=3600` response reached the origin once across all launches. After `max-age=15` expired, the new process sent the ETag validator, received HTTP 304, and recovered the exact stored body. `no-cache` revalidated; `no-store` downloaded again and had no disk-cache entry.
+- A test-only `Cache-Control: no-cache` request to the real production URL also produced HTTP 304 with zero response-body network bytes and the correct recovered body. This deliberately forced revalidation; natural production expiry was not observed.
+- The production package response had ETag and Last-Modified, but no Cache-Control or Expires. It was reused by Foundation in this test; its freshness duration is not explicitly specified by the server. Explicit server cache headers remain worth confirming for the deployed package path.
+- Dev was rechecked: anonymous access returned HTTP 401 and the saved CLI login refresh returned AUTH_FAILED. The dev acceptance check remains blocked on access and project confirmation.
+
+Screenshots, the external host source, URLSession metrics, origin request logs, and assertions are retained outside the SDK repository. No SDK implementation changes were needed, and no project content was modified. Physical-device behavior and the complete chat flow were not tested in this run.
