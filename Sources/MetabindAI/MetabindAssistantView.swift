@@ -21,6 +21,7 @@ import MCPAppsHost
 public struct MetabindAssistantView: View {
     private let assistant: MetabindAssistant
     @State private var inputText = ""
+    @FocusState private var isInputFocused: Bool
     @Environment(\.openURL) private var openURL
 
     public init(assistant: MetabindAssistant) {
@@ -60,18 +61,30 @@ public struct MetabindAssistantView: View {
 
     private var messageList: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                VStack(spacing: 16) {
-                    ForEach(assistant.conversation.messages) { message in
-                        MessageBubble(message: message)
-                            .id(message.id)
-                    }
+            GeometryReader { viewport in
+                ScrollView {
+                    VStack(spacing: 16) {
+                        ForEach(assistant.conversation.messages) { message in
+                            MessageBubble(message: message)
+                                .id(message.id)
+                        }
 
-                    if assistant.isProcessing {
-                        streamingIndicator
+                        if assistant.isProcessing {
+                            streamingIndicator
+                        }
+                    }
+                    .padding(.vertical)
+                    .frame(maxWidth: .infinity, minHeight: viewport.size.height, alignment: .top)
+                    .background {
+                        // Fill empty conversations too. Keep this gesture behind
+                        // card controls so tapping an input does not dismiss it.
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { isInputFocused = false }
                     }
                 }
-                .padding(.vertical)
+                .scrollDismissesKeyboard(.interactively)
+                .scrollBounceBehavior(.always, axes: .vertical)
             }
             .onChange(of: assistant.conversation.messages.count) { _, _ in
                 scrollToBottom(proxy)
@@ -102,33 +115,46 @@ public struct MetabindAssistantView: View {
 
     // MARK: - Input Bar
 
+    private var canSend: Bool {
+        !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !assistant.isProcessing
+    }
+
     private var inputBar: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        HStack(alignment: .bottom, spacing: 4) {
             TextField("Message", text: $inputText, axis: .vertical)
                 .lineLimit(1...5)
+                .focused($isInputFocused)
                 .textFieldStyle(.plain)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                .frame(minHeight: 44)
                 .background(.fill.tertiary, in: .rect(cornerRadius: 20))
                 .onSubmit { send() }
 
             Button {
                 send()
             } label: {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title2)
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(canSend ? Color.accentColor : Color.secondary.opacity(0.35), in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .disabled(
-                inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    || assistant.isProcessing
-            )
+            .buttonStyle(.plain)
+            .accessibilityLabel("Send message")
+            .disabled(!canSend)
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
     }
 
     private func send() {
-        let text = inputText
+        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !assistant.isProcessing else { return }
+        isInputFocused = false
         inputText = ""
         assistant.send(text)
     }

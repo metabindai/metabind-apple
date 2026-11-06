@@ -67,7 +67,7 @@ public actor MCPAppsClient: MCPServer {
     private let url: URL
     private let resolvers: [any ContentResolver]
     private let configuration: Configuration
-    private let headerProvider: @Sendable () async -> [String: String]
+    private let headerProvider: @Sendable () async throws -> [String: String]
 
     private var isConnected = false
     private var connectionTask: Task<Void, any Error>?
@@ -82,7 +82,12 @@ public actor MCPAppsClient: MCPServer {
 
     /// Resource reads currently in flight, keyed by URI. A prefetch and a real
     /// render of the same card share one request rather than racing to issue two.
-    private var inFlightReads: [String: Task<ResourceContent, any Error>] = [:]
+    private struct ResourceRead {
+        let id: UUID
+        let task: Task<ResourceContent, any Error>
+    }
+    private var inFlightReads: [String: ResourceRead] = [:]
+    private var resourceCacheGeneration: UInt64 = 0
 
     private static let modernProtocolVersion = "2026-07-28"
     private static let supportedLegacyVersions: Set<String> = [
@@ -171,7 +176,7 @@ public actor MCPAppsClient: MCPServer {
     ///
     public init(
         url: URL,
-        headerProvider: @escaping @Sendable () async -> [String: String],
+        headerProvider: @escaping @Sendable () async throws -> [String: String],
         resolvers: [any ContentResolver] = defaultResolvers,
         configuration: Configuration = Configuration()
     ) {
@@ -255,12 +260,17 @@ public actor MCPAppsClient: MCPServer {
         // issuing a second request for the same bytes.
         if let inFlight = inFlightReads[uri] {
             log.info("resources/read → \(uri) (in flight)")
-            return try await inFlight.value
+            return try await inFlight.task.value
         }
 
-        let task = Task { try await self.performResourceRead(uri: uri) }
-        inFlightReads[uri] = task
-        defer { inFlightReads[uri] = nil }
+        let id = UUID()
+        let generation = resourceCacheGeneration
+        let task = Task { try await self.performResourceRead(uri: uri, generation: generation) }
+        inFlightReads[uri] = ResourceRead(id: id, task: task)
+        defer {
+            // A retired read must not remove a newer request for the same URI.
+            if inFlightReads[uri]?.id == id { inFlightReads[uri] = nil }
+        }
         return try await task.value
     }
 
@@ -280,7 +290,7 @@ public actor MCPAppsClient: MCPServer {
         }
     }
 
-    private func performResourceRead(uri: String) async throws -> ResourceContent {
+    private func performResourceRead(uri: String, generation: UInt64) async throws -> ResourceContent {
         log.info("resources/read → \(uri)")
         let params: [String: Any] = ["uri": uri]
         let response = try await sendRequest(method: "resources/read", params: params)
@@ -307,6 +317,10 @@ public actor MCPAppsClient: MCPServer {
             blob: (first["blob"] as? String).flatMap { Data(base64Encoded: $0) }
         )
 
+        // A read retired by a cache clear still answers the callers already
+        // waiting on it, but its bytes may predate the clear, so they must not
+        // repopulate the cache.
+        guard generation == resourceCacheGeneration else { return resource }
         switch protocolEra {
         case .legacy:
             resourceCache.set(uri, CachedResource(content: resource, expiresAt: nil))
@@ -402,7 +416,11 @@ public actor MCPAppsClient: MCPServer {
 
     /// Clears the resource cache. Call when the server notifies that resources have changed.
     public func clearResourceCache() {
+        resourceCacheGeneration &+= 1
         resourceCache.removeAll()
+        // Detach in-flight reads rather than cancelling them: a card may be
+        // waiting on one, and cancelling it fails that card.
+        inFlightReads.removeAll()
     }
 
     // MARK: - Protocol Negotiation
@@ -748,6 +766,8 @@ public actor MCPAppsClient: MCPServer {
         protocolVersion = nil
         sessionId = nil
         toolHeaderMappings.removeAll()
+        // A new session is not a resource change. Reads in flight retry on it,
+        // so they stay shared and may still populate the cache.
         resourceCache.removeAll()
     }
 
@@ -962,7 +982,7 @@ public actor MCPAppsClient: MCPServer {
         request.timeoutInterval = configuration.requestTimeout
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let headers = await headerProvider()
+        let headers = try await headerProvider()
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }

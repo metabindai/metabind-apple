@@ -47,6 +47,7 @@ public struct MCPAppContent: View {
                 let _ = log.info("[\(session.toolName, privacy: .public)] BindJS render \(Self.describeStructure(.object(args.mapValues { JSONValue.from($0) })), privacy: .public)")
                 BindJSView(content: content, arguments: args)
                     .bindJS(bindJSConfiguration)
+                    .id(session.resourceContextRevision)
             case .html(let html):
                 HTMLAppView(html: html)
             }
